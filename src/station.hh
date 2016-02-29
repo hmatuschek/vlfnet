@@ -1,40 +1,40 @@
 #ifndef STATION_HH
 #define STATION_HH
 
-#include <ovlnet/crypto.hh>
-#include <QApplication>
+#include "location.hh"
+#include <ovlnet/node.hh>
+#include <ovlnet/httpservice.hh>
 
-class Node;
-class LogModel;
 class StationList;
 
 
-class Station : public QApplication
+class Station : public Node, public HttpRequestHandler
 {
   Q_OBJECT
 
 public:
-  explicit Station(int &argc, char **argv);
+  explicit Station(Identity &id, const Location &location,
+                   const QHostAddress &addr=QHostAddress::Any, uint16_t port=7741,
+                   QObject *parent=0);
 
-  /** Returns the OvlNet node of the station.*/
-  Node &node();
-
-  /** Returns a weak reference to the log-message table model. */
-  LogModel &log();
+  /** Returns the location of the station. */
+  const Location &location() const;
+  /** Sets the location of the station. */
+  void setLocation(const Location &loc);
 
   /** Returns a list of known stations. */
   StationList &stations();
 
-protected:
-  /** The identity of the node within the ovlnet. */
-  Identity *_identity;
-  /** Overlay network node representing this station. */
-  Node *_node;
+  bool acceptReqest(HttpRequest *request);
+  HttpResponse *processRequest(HttpRequest *request);
 
-  /** A model to capture log messages for display. */
-  LogModel *_logmodel;
+protected:
+  /** My location. */
+  Location _location;
   /** A list of known stations. */
   StationList *_stations;
 };
+
+
 
 #endif // STATION_HH

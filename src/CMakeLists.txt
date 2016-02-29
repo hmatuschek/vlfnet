@@ -1,7 +1,7 @@
 set(VLF_CLIENT_SOURCES main.cc location.cc
-    station.cc logwindow.cc stationlist.cc)
+    station.cc logwindow.cc stationlist.cc application.cc query.cc)
 set(VLF_CLIENT_MOC_HEADERS
-    station.hh logwindow.hh stationlist.hh)
+    station.hh logwindow.hh stationlist.hh application.hh query.hh)
 set(VLF_CLIENT_HEADERS ${VLF_CLIENT_MOC_HEADERS}
     location.hh)
 

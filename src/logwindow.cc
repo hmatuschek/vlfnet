@@ -8,7 +8,7 @@
 #include <QCloseEvent>
 #include <QFileInfo>
 
-#include "station.hh"
+#include "application.hh"
 
 
 LogModel::LogModel(QObject *parent)
@@ -89,7 +89,7 @@ LogModel::handleMessage(const LogMessage &msg) {
 
 
 
-LogWidget::LogWidget(Station &app)
+LogWidget::LogWidget(Application &app)
   : QWidget(0)
 {
   setMinimumSize(640, 360);

@@ -1,7 +1,121 @@
 #include "stationlist.hh"
 #include "station.hh"
+#include "query.hh"
+#include <ovlnet/utils.hh>
+#include <QJsonObject>
 
 
+/* ********************************************************************************************* *
+ * Implementation of StationItem
+ * ********************************************************************************************* */
+StationItem::StationItem()
+  : _lastSeen(), _node(), _location(), _description()
+{
+  // pass...
+}
+
+StationItem::StationItem(const Identifier &id, const Location &location, const QString &descr)
+  : _lastSeen(QDateTime::currentDateTime()), _node(id, QHostAddress(), 0), _location(location),
+    _description(descr)
+{
+  // pass...
+}
+
+StationItem::StationItem(const NodeItem &node, const Location &location, const QString &descr)
+  : _lastSeen(QDateTime::currentDateTime()), _node(node), _location(location), _description(descr)
+{
+  // pass...
+}
+
+StationItem::StationItem(const NodeItem &node, const QJsonValue &val)
+  : _lastSeen(QDateTime::currentDateTime()), _node(node), _location(), _description()
+{
+  if (! val.isObject()) {
+    logDebug() << "Cannot construct StationItem from JSON document: Is not an Object.";
+    _node = NodeItem(); return;
+  }
+  QJsonObject obj = val.toObject();
+
+  if (! obj.contains("id")) {
+    logDebug() << "Cannot construct StationItem from JSON document: Does not specify a station ID.";
+    _node = NodeItem(); return;
+  }
+  // Verify node info with ID
+  Identifier id = Identifier::fromBase32(obj.value("id").toString());
+  if (_node.id() != id) {
+    logDebug() << "Cannot construct StationItem from JSON document: Node ID missmatch!";
+    _node = NodeItem(); return;
+  }
+
+  if (! obj.contains("location")) {
+    logDebug() << "Cannot construct StationItem from JSON document: No location specified.";
+    _node = NodeItem(); return;
+  }
+  _location = Location(obj.value("location"));
+  _description = obj.value("description").toString();
+}
+
+StationItem::StationItem(const StationItem &other)
+  : _lastSeen(other._lastSeen), _node(other._node), _location(other._location),
+    _description(other._description)
+{
+  // pass...
+}
+
+StationItem &
+StationItem::operator =(const StationItem &other) {
+  _lastSeen = other._lastSeen;
+  _node = other._node;
+  _location = other._location;
+  _description = other._description;
+  return *this;
+}
+
+bool
+StationItem::isNull() const {
+  return _node.id().isEmpty();
+}
+
+const QDateTime &
+StationItem::lastSeen() const {
+  return _lastSeen;
+}
+
+const Identifier &
+StationItem::id() const {
+  return _node.id();
+}
+
+const NodeItem &
+StationItem::node() const {
+  return _node;
+}
+
+const PeerItem &
+StationItem::peer() const {
+  return _node;
+}
+
+const Location &
+StationItem::location() const {
+  return _location;
+}
+
+const QString &
+StationItem::description() const {
+  return _description;
+}
+
+void
+StationItem::update(const PeerItem &peer) {
+  _node = NodeItem(_node.id(), peer);
+  _lastSeen = QDateTime::currentDateTime();
+}
+
+
+/* ********************************************************************************************* *
+ * Implementation of StationList
+ * ********************************************************************************************* */
 StationList::StationList(Station &station)
   : QAbstractTableModel(&station), _station(station)
 {
@@ -10,6 +124,14 @@ StationList::StationList(Station &station)
           this, SLOT(_onStationAppeared(Identifier)));
   connect(&_station, SIGNAL(stationDisappeared(Identifier)),
           this, SLOT(_onStationDisappeared(Identifier)));
+
+  // every 2min update the network of known stations
+  _networkUpdateTimer.setInterval(1000*120);
+  _networkUpdateTimer.setSingleShot(false);
+
+  connect(&_networkUpdateTimer, SIGNAL(timeout()), this, SLOT(_onUpdateNetwork()));
+
+  _networkUpdateTimer.start();
 
   // done...
 }
@@ -59,6 +181,27 @@ StationList::indexOf(const Identifier &id) const {
 }
 
 void
+StationList::addCandidate(const Identifier &id) {
+  if (! hasStation(id)) {
+    _candidates.insert(id);
+  }
+}
+
+void
+StationList::contactStation(const NodeItem &node) {
+  StationInfoQuery *query = new StationInfoQuery(_station, node);
+  connect(query, SIGNAL(stationInfoReceived(StationItem)),
+          this, SLOT(updateStation(StationItem)));
+}
+
+void
+StationList::contactStation(const Identifier &node) {
+  StationInfoQuery *query = new StationInfoQuery(_station, node);
+  connect(query, SIGNAL(stationInfoReceived(StationItem)),
+          this, SLOT(updateStation(StationItem)));
+}
+
+void
 StationList::_onNodeAppeared(const NodeItem &node) {
   if (hasStation(node.id())) {
     station(node.id()).update(node);
@@ -70,6 +213,56 @@ StationList::_onNodeDisappeared(const NodeItem &id) {
   // pass...
 }
 
+void
+StationList::updateStation(const StationItem &station) {
+  if (station.isNull()) { return; }
+  if (hasStation(station.id())) {
+    // If station extists: update station
+    size_t idx = indexOf(station.id());
+    _stations[idx] = station;
+    emit dataChanged(index(idx, 0), index(idx, 4));
+  } else {
+    // Remove from candidates
+    _candidates.remove(station.id());
+    // & add to station list
+    beginInsertRows(QModelIndex(), _stations.size(), _stations.size());
+    _stations.append(station);
+    endInsertRows();
+  }
+}
+
+void
+StationList::addToCandidates(const QList<Identifier> &nodes) {
+  logDebug() << "Received list of " << nodes.size() << " station identifiers.";
+  QList<Identifier>::const_iterator node = nodes.begin();
+  for (; node != nodes.end(); node++) {
+    if (! hasStation(*node)) { _candidates.insert(*node); }
+  }
+}
+
+void
+StationList::_onUpdateNetwork() {
+  // As long as there are items in the candidate queue -> contact them
+  if (_candidates.size()) {
+    // Take some element
+    Identifier id = *_candidates.begin(); _candidates.remove(id);
+    contactStation(id);
+    return;
+  }
+
+  // If all candidates has been contacted search for new candidates
+  if (_stations.size()) {
+    size_t idx = dht_rand32() % _stations.size();
+    // Update station
+    contactStation(_stations[idx].id());
+    // and get station list
+    StationListQuery *query = new StationListQuery(_station, _stations[idx].id());
+    connect(query, SIGNAL(stationListReceived(QList<Identifier>)),
+            this, SLOT(addToCandidates(QList<Identifier>)));
+  }
+}
+
+/* ******************** Implementation of QAbstractTableModel interface ******************** */
 int
 StationList::rowCount(const QModelIndex &parent) const {
   return numStations();

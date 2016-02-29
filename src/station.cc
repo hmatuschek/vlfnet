@@ -1,149 +1,33 @@
 #include "station.hh"
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QJsonArray>
 
 #include <ovlnet/node.hh>
+
+#include "location.hh"
 #include "logwindow.hh"
 #include "stationlist.hh"
-
-#include <QDir>
-#include <QStandardPaths>
-
-
-/* ********************************************************************************************* *
- * Implementation of StationItem
- * ********************************************************************************************* */
-StationItem::StationItem()
-  : _lastSeen(), _node(), _location(), _description()
-{
-  // pass...
-}
-
-StationItem::StationItem(const Identifier &id, const Location &location, const QString &descr)
-  : _lastSeen(QDateTime::currentDateTime()), _node(id, QHostAddress(), 0), _location(location),
-    _description(descr)
-{
-  // pass...
-}
-
-StationItem::StationItem(const NodeItem &node, const Location &location, const QString &descr)
-  : _lastSeen(QDateTime::currentDateTime()), _node(node), _location(location), _description(descr)
-{
-  // pass...
-}
-
-StationItem::StationItem(const StationItem &other)
-  : _lastSeen(other._lastSeen), _node(other._node), _location(other._location),
-    _description(other._description)
-{
-  // pass...
-}
-
-StationItem &
-StationItem::operator =(const StationItem &other) {
-  _lastSeen = other._lastSeen;
-  _node = other._node;
-  _location = other._location;
-  _description = other._description;
-  return *this;
-}
-
-bool
-StationItem::isNull() const {
-  return _node.id().isEmpty();
-}
-
-const QDateTime &
-StationItem::lastSeen() const {
-  return _lastSeen;
-}
-
-const Identifier &
-StationItem::id() const {
-  return _node.id();
-}
-
-const NodeItem &
-StationItem::node() const {
-  return _node;
-}
-
-const PeerItem &
-StationItem::peer() const {
-  return _node;
-}
-
-const Location &
-StationItem::location() const {
-  return _location;
-}
-
-const QString &
-StationItem::description() const {
-  return _description;
-}
-
-void
-StationItem::update(const PeerItem &peer) {
-  _node = NodeItem(_node.id(), peer);
-  _lastSeen = QDateTime::currentDateTime();
-}
 
 
 /* ********************************************************************************************* *
  * Implementation of Station
  * ********************************************************************************************* */
-Station::Station(int &argc, char **argv)
-  : QApplication(argc, argv), _identity(0), _node(0), _logmodel(0), _stations(0)
+Station::Station(Identity &id, const Location &location, const QHostAddress &addr, uint16_t port, QObject *parent)
+  : Node(id, addr, port, parent), HttpRequestHandler(), _location(location), _stations(0)
 {
-  // Create log model
-  _logmodel = new LogModel();
-  Logger::addHandler(_logmodel);
-
-  // Set application name
-  setApplicationName("ovlclient");
-  setOrganizationName("io.github.hmatuschek");
-  setOrganizationDomain("io.github.hmatuschek");
-
-  // Try to load identity from file
-  QDir nodeDir = QStandardPaths::writableLocation(
-        QStandardPaths::DataLocation);
-  // check if VLF directory exists
-  if (! nodeDir.exists()) {
-    nodeDir.mkpath(nodeDir.absolutePath());
-  }
-  // Load or create identity
-  QString idFile(nodeDir.canonicalPath()+"/identity.pem");
-  if (!QFile::exists(idFile)) {
-    logInfo() << "No identity found -> create new identity.";
-    _identity = Identity::newIdentity();
-    if (_identity) { _identity->save(idFile); }
-  } else {
-    logDebug() << "Load identity from" << idFile;
-    _identity = Identity::load(idFile);
-  }
-
-  if (0 == _identity) {
-    logError() << "Error while loading or creating identity.";
-    return;
-  }
-
-  // Create log model
-  //_logModel = new LogModel();
-  Logger::addHandler(_logmodel);
-
-  // Create DHT instance
-  _node = new Node(*_identity, QHostAddress::Any, 7742);
-
   _stations = new StationList(*this);
+  registerService("vlf::station", new HttpService(*this, this, this));
 }
 
-Node &
-Station::node() {
-  return *_node;
+const Location &
+Station::location() const {
+  return _location;
 }
 
-LogModel &
-Station::log() {
-  return *_logmodel;
+void
+Station::setLocation(const Location &loc) {
+  _location = loc;
 }
 
 StationList &
@@ -151,3 +35,42 @@ Station::stations() {
   return *_stations;
 }
 
+bool
+Station::acceptReqest(HttpRequest *request) {
+  if ((HTTP_GET == request->method()) && ("/status" == request->uri().path())) {
+    return true;
+  }
+  if ((HTTP_GET == request->method()) && ("/list" == request->uri().path())) {
+    return true;
+  }
+  return false;
+}
+
+HttpResponse *
+Station::processRequest(HttpRequest *request) {
+  if ((HTTP_GET == request->method()) && ("/status" == request->uri().path())) {
+    // Handle station info request
+    // Assemble location
+    QJsonObject location;
+    location.insert("longitude", _location.longitude());
+    location.insert("latitude", _location.latitude());
+    location.insert("height", _location.height());
+    // Assemble result
+    QJsonObject result;
+    result.insert("id", id().toBase32());
+    result.insert("location", location);
+    // Send response as JSON
+    return new HttpJsonResponse(QJsonDocument(result), request);
+  } else if ((HTTP_GET == request->method()) && ("/status" == request->uri().path())) {
+    // Handle stations list request
+    QJsonArray stations;
+    for (size_t i=0; i<_stations->numStations(); i++) {
+      stations.append(_stations->station(i).id().toBase32());
+    }
+    return new HttpJsonResponse(QJsonDocument(stations), request);
+  }
+
+  // Unknown request -> send a 404
+  return new HttpStringResponse(
+        request->version(), HTTP_NOT_FOUND, "Not found", request->socket());
+}

@@ -6,7 +6,7 @@
 #include <QTableView>
 #include <ovlnet/logger.hh>
 
-class Station;
+class Application;
 
 
 class LogModel: public QAbstractTableModel, public LogHandler
@@ -34,7 +34,7 @@ class LogWidget: public QWidget
   Q_OBJECT
 
 public:
-  explicit LogWidget(Station &app);
+  explicit LogWidget(Application &app);
 
 protected:
   QTableView *_table;
