@@ -27,15 +27,9 @@ StationItem::StationItem(const NodeItem &node, const Location &location, const Q
   // pass...
 }
 
-StationItem::StationItem(const NodeItem &node, const QJsonValue &val)
+StationItem::StationItem(const NodeItem &node, const QJsonObject &obj)
   : _lastSeen(QDateTime::currentDateTime()), _node(node), _location(), _description()
 {
-  if (! val.isObject()) {
-    logDebug() << "Cannot construct StationItem from JSON document: Is not an Object.";
-    _node = NodeItem(); return;
-  }
-  QJsonObject obj = val.toObject();
-
   if (! obj.contains("id")) {
     logDebug() << "Cannot construct StationItem from JSON document: Does not specify a station ID.";
     _node = NodeItem(); return;
@@ -51,7 +45,7 @@ StationItem::StationItem(const NodeItem &node, const QJsonValue &val)
     logDebug() << "Cannot construct StationItem from JSON document: No location specified.";
     _node = NodeItem(); return;
   }
-  _location = Location(obj.value("location"));
+  _location = Location(obj.value("location").toObject());
   _description = obj.value("description").toString();
 }
 
@@ -119,12 +113,6 @@ StationItem::update(const PeerItem &peer) {
 StationList::StationList(Station &station)
   : QAbstractTableModel(&station), _station(station)
 {
-  // Connect to signals of station instance about appearance of other stations
-  connect(&_station, SIGNAL(stationAppeared(Identifier)),
-          this, SLOT(_onStationAppeared(Identifier)));
-  connect(&_station, SIGNAL(stationDisappeared(Identifier)),
-          this, SLOT(_onStationDisappeared(Identifier)));
-
   // every 2min update the network of known stations
   _networkUpdateTimer.setInterval(1000*120);
   _networkUpdateTimer.setSingleShot(false);
@@ -199,18 +187,6 @@ StationList::contactStation(const Identifier &node) {
   StationInfoQuery *query = new StationInfoQuery(_station, node);
   connect(query, SIGNAL(stationInfoReceived(StationItem)),
           this, SLOT(updateStation(StationItem)));
-}
-
-void
-StationList::_onNodeAppeared(const NodeItem &node) {
-  if (hasStation(node.id())) {
-    station(node.id()).update(node);
-  }
-}
-
-void
-StationList::_onNodeDisappeared(const NodeItem &id) {
-  // pass...
 }
 
 void

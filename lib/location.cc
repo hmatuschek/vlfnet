@@ -24,15 +24,9 @@ Location::Location(double lon, double lat, double height)
   // pass...
 }
 
-Location::Location(const QJsonValue &val)
+Location::Location(const QJsonObject &obj)
   : _longitude(0), _latitude(0), _radius(0)
 {
-  if (! val.isObject()) {
-    logDebug() << "Cannot construct Location from JSON: Is not an object.";
-    return;
-  }
-  QJsonObject obj = val.toObject();
-
   if (! obj.contains("longitude")) {
     logDebug() << "Cannot construct Location from JSON: No longitude specified.";
     return;
@@ -95,6 +89,20 @@ Location::dist(const Location &other) {
   dy -= other._radius*std::cos(other._longitude);
   dz -= other._radius*std::sin(other._latitude);
   return std::sqrt(dx*dx + dy*dy + dz*dz);
+}
+
+QString
+Location::toString() const {
+  return QString("%1, %2, %3").arg(longitude()).arg(latitude()).arg(height());
+}
+
+QJsonObject
+Location::toJson() const {
+  QJsonObject loc;
+  loc.insert("latitude", latitude());
+  loc.insert("longitude", longitude());
+  loc.insert("height", height());
+  return loc;
 }
 
 Location

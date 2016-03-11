@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="stylesheet" href="http://cdn.leafletjs.com/leaflet/v0.7.7/leaflet.css" />
+  <style>
+   html, body {
+    width: 100%;
+    height: 100%;
+    padding: 0px;
+    margin: 0px;
+   }
+  </style>
+</head>
+
+<body>
+  <div id="mapid" style="width: 100%; height: 100%"></div>
+  <script src="http://cdn.leafletjs.com/leaflet/v0.7.7/leaflet.js"></script>
+
+  <script>
+    var map = L.map('mapid').setView([0, 0], 4);
+    L.tileLayer('http://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+    var local = L.marker([0, 0]).addTo(map);
+    var stations = {};
+
+    function setLocal(lon, lat) {
+      local.setLatLng([lon, lat]);
+      map.setView([lon, lat]);
+    };
+
+    function setStation(id, lon, lat) {
+      if (id in stations) {
+        stations[id].setLatLng[lon, lat];
+      } else {
+        stations[id] = L.marker([lon, lat]).addTo(map);
+      }
+    }
+  </script>
+</body>
+</html>

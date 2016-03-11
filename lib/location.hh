@@ -2,6 +2,7 @@
 #define LOCATION_HH
 
 #include <QString>
+#include <QJsonObject>
 
 class QJsonValue;
 
@@ -14,7 +15,7 @@ public:
    * @param lat Specifies the latitude in degrees.
    * @param height Specifies the heigth above sealevel in meters. */
   Location(double lon, double lat, double height);
-  Location(const QJsonValue &val);
+  Location(const QJsonObject &obj);
   Location(const Location &other);
 
   Location &operator= (const Location &other);
@@ -27,6 +28,9 @@ public:
 
   /** Direct distance between two points. */
   double dist(const Location &other);
+
+  QString toString() const;
+  QJsonObject toJson() const;
 
 public:
   static Location fromFile(const QString &path);

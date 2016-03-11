@@ -20,7 +20,7 @@ public:
   StationItem();
   StationItem(const Identifier &id, const Location &location, const QString &descr="");
   StationItem(const NodeItem &node, const Location &location, const QString &descr="");
-  StationItem(const NodeItem &node, const QJsonValue &doc);
+  StationItem(const NodeItem &node, const QJsonObject &obj);
   StationItem(const StationItem &other);
 
   StationItem &operator=(const StationItem &other);
@@ -76,8 +76,6 @@ protected:
   size_t indexOf(const Identifier &id) const;
 
 private slots:
-  void _onNodeAppeared(const NodeItem &node);
-  void _onNodeDisappeared(const NodeItem &id);
   void _onUpdateNetwork();
 
 protected:

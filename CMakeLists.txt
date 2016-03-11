@@ -5,12 +5,19 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${PROJECT_SOURCE_DIR}/cmake
     ${CMAKE_INSTALL_PREFIX}/share/ovlnet)
 include(InstallHeadersWithDirectory)
 
+option(WITH_SYSTEMD "Install systemd service file." OFF)
+option(WITH_UPSTART "Install upstart service file." OFF)
+option(WITH_LAUNCHD "Install LaunchD service file." OFF)
+
 find_package(Qt5Core REQUIRED)
 find_package(Qt5Widgets REQUIRED)
 find_package(Qt5Network REQUIRED)
 find_package(Qt5Xml REQUIRED)
-#find_package(Opus REQUIRED)
-#find_package(PortAudio REQUIRED)
+find_package(Qt5Multimedia REQUIRED)
+find_package(Qt5Positioning REQUIRED)
+find_package(Qt5WebKitWidgets REQUIRED)
+find_package(FFTW REQUIRED)
+#
 find_package(OpenSSL REQUIRED)
 find_package(ovlnet REQUIRED)
 
@@ -24,20 +31,23 @@ INCLUDE_DIRECTORIES(${Qt5Declarative_INCLUDE_DIRS})
 INCLUDE_DIRECTORIES(${Qt5Widgets_INCLUDE_DIRS})
 INCLUDE_DIRECTORIES(${Qt5Network_INCLUDE_DIRS})
 INCLUDE_DIRECTORIES(${Qt5Xml_INCLUDE_DIRS})
+INCLUDE_DIRECTORIES(${Qt5Multimedia_INCLUDE_DIRS})
+INCLUDE_DIRECTORIES(${Qt5Positioning_INCLUDE_DIRS})
+INCLUDE_DIRECTORIES(${Qt5WebKitWidgets_INCLUDE_DIRS})
 INCLUDE_DIRECTORIES(${OPENSSL_INCLUDE_DIR})
-INCLUDE_DIRECTORIES(${OPUS_INCLUDE_DIRS})
+INCLUDE_DIRECTORIES(${FFTW_INCLUDE_DIRS})
 INCLUDE_DIRECTORIES(${OVLNET_INCLUDE_DIRS})
 INCLUDE_DIRECTORIES(${CMAKE_BINARY_DIR})
 INCLUDE_DIRECTORIES(${PROJECT_SOURCE_DIR})
 
-set(LIBS ${Qt5Core_LIBRARIES} ${Qt5Widgets_LIBRARIES} ${Qt5Network_LIBRARIES}
-    ${Qt5Xml_LIBRARIES} ${OPENSSL_CRYPTO_LIBRARY} ${OPUS_LIBRARIES} ${PORTAUDIO_LIBRARIES} 
-    ${OVLNET_LIBRARIES})
+set(LIBS ${Qt5Core_LIBRARIES} ${Qt5Widgets_LIBRARIES} ${Qt5Network_LIBRARIES} ${Qt5Xml_LIBRARIES}
+    ${Qt5Multimedia_LIBRARIES} ${Qt5Positioning_LIBRARIES} ${Qt5WebKitWidgets_LIBRARIES}
+    ${OPENSSL_CRYPTO_LIBRARY} ${FFTW_LIBRARIES} ${PORTAUDIO_LIBRARIES} ${OVLNET_LIBRARIES})
 
 add_definitions(-DPOSIX)
 
 # Set compiler flags
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${Qt5Widgets_EXECUTABLE_COMPILE_FLAGS} -Wall")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${Qt5Widgets_EXECUTABLE_COMPILE_FLAGS} -Wall -std=c++11")
 set(CMAKE_CXX_FLAGS_DEBUG   "${CMAKE_CXX_FLAGS_DEBUG} -O0 -ggdb")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -ggdb")
 
@@ -58,7 +68,9 @@ ELSE(UNIX AND NOT APPLE)
 ENDIF(UNIX AND NOT APPLE)
 
 # application sources...
-add_subdirectory(src)
+add_subdirectory(lib)
+add_subdirectory(client)
+add_subdirectory(daemon)
 
 # Source distribution packages:
 set(CPACK_PACKAGE_VERSION_MAJOR "1")

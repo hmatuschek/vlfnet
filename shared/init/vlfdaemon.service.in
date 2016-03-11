@@ -1,0 +1,10 @@
+[Unit]
+Description=VLF Observatory Network Daemon
+Requires=network.target
+
+[Service]
+ExecStart=${CMAKE_INSTALL_PREFIX}/bin/vlfdaemon \
+  --config-dir=${CMAKE_INSTALL_PREFIX}/share/vlfdaemon/
+
+[Install]
+WantedBy=multi-user.target

@@ -1,3 +1,5 @@
 <RCC>
-    <qresource prefix="/"/>
+    <qresource prefix="/">
+        <file>stations_map.html</file>
+    </qresource>
 </RCC>

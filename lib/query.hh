@@ -2,6 +2,7 @@
 #define QUERY_HH
 
 #include <ovlnet/httpclient.hh>
+#include "schedule.hh"
 
 class StationItem;
 
@@ -79,5 +80,35 @@ protected:
   size_t _responseLength;
   QByteArray _buffer;
 };
+
+
+/** Self-destructing query for the station schedule. */
+class StationScheduleQuery: public QObject
+{
+  Q_OBJECT
+
+public:
+  StationScheduleQuery(Node &node, const Identifier &remote);
+  StationScheduleQuery(Node &node, const NodeItem &remote);
+
+signals:
+  void stationScheduleReceived(const QList<ScheduledEvent> &events);
+  void failed();
+
+protected slots:
+  void _onNodeFound(const NodeItem &node);
+  void _onConnectionEstablished();
+  void _onResponseReceived();
+  void _onError();
+  void _onReadyRead();
+
+protected:
+  Node &_node;
+  HttpClientConnection *_connection;
+  HttpClientResponse *_response;
+  size_t _responseLength;
+  QByteArray _buffer;
+};
+
 
 #endif // QUERY_HH

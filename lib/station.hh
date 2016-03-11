@@ -6,7 +6,8 @@
 #include <ovlnet/httpservice.hh>
 
 class StationList;
-
+class Schedule;
+class Receiver;
 
 class Station : public Node, public HttpRequestHandler
 {
@@ -14,6 +15,8 @@ class Station : public Node, public HttpRequestHandler
 
 public:
   explicit Station(Identity &id, const Location &location,
+                   const QString scheduleFile, const QString &dataDir,
+                   const QString &audioDeviceName="",
                    const QHostAddress &addr=QHostAddress::Any, uint16_t port=7741,
                    QObject *parent=0);
 
@@ -25,7 +28,12 @@ public:
   /** Returns a list of known stations. */
   StationList &stations();
 
+  /** Returns the schedule of the station. */
+  Schedule &schedule();
+
+  /** Filters HTTP requests. */
   bool acceptReqest(HttpRequest *request);
+  /** Processes accepted HTTP requests. */
   HttpResponse *processRequest(HttpRequest *request);
 
 protected:
@@ -33,6 +41,10 @@ protected:
   Location _location;
   /** A list of known stations. */
   StationList *_stations;
+  /** The reception schedule of the station. */
+  Schedule *_schedule;
+  /** The receiver. */
+  Receiver *_receiver;
 };
 
 

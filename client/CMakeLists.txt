@@ -1,15 +1,17 @@
-set(VLF_CLIENT_SOURCES main.cc location.cc
-    station.cc logwindow.cc stationlist.cc application.cc query.cc)
+set(VLF_CLIENT_SOURCES main.cc
+    application.cc mainwindow.cc logwindow.cc stationlistview.cc monitor.cc scheduleview.cc
+    newscheduledeventdialog.cc locationeditdialog.cc osmwidget.cc)
 set(VLF_CLIENT_MOC_HEADERS
-    station.hh logwindow.hh stationlist.hh application.hh query.hh)
+    application.hh mainwindow.hh logwindow.hh stationlistview.hh monitor.hh scheduleview.hh
+    newscheduledeventdialog.hh locationeditdialog.hh osmwidget.hh)
 set(VLF_CLIENT_HEADERS ${VLF_CLIENT_MOC_HEADERS}
-    location.hh)
+    )
 
 qt5_wrap_cpp(VLF_CLIENT_MOC_SOURCES ${VLF_CLIENT_MOC_HEADERS})
 qt5_add_resources(VLF_CLIENT_RCC_SOURCES ../shared/resources.qrc)
 
 add_executable(vlfclient ${VLF_CLIENT_SOURCES} ${VLF_CLIENT_MOC_SOURCES} ${VLF_CLIENT_RCC_SOURCES})
-target_link_libraries(vlfclient ${LIBS})
+target_link_libraries(vlfclient vlfnet ${LIBS})
 
 # Install binary
 INSTALL(TARGETS vlfclient DESTINATION bin)
