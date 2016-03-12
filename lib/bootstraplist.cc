@@ -26,12 +26,11 @@ BootstrapList::fromFile(const QString &filename) {
   }
 
   QJsonArray lst = doc.array();
-  QJsonArray::iterator item = lst.begin();
-  for (; item != lst.end(); item++) {
-    if (! item->isObject()) {
+  for (int i=0; i<lst.size(); i++) {
+    if (! lst.at(i).isObject()) {
       continue;
     }
-    QJsonObject obj = item->toObject();
+    QJsonObject obj = lst.at(i).toObject();
     if ((! obj.contains("host")) || (! obj.contains("port"))) {
       continue;
     }
