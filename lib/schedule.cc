@@ -128,7 +128,7 @@ Schedule::Schedule(QObject *parent)
 QDateTime
 Schedule::next(const QDateTime &now) const {
   QDateTime next;
-  for (size_t i=0; i<_events.size(); i++) {
+  for (int i=0; i<_events.size(); i++) {
     QDateTime evt = _events[i].nextEvent(now);
     if (evt.isValid() && (!next.isValid() || (evt<next))) {
       next = evt;
@@ -179,7 +179,7 @@ Schedule::scheduledEvent(size_t idx) const {
 
 void
 Schedule::removeScheduledEvent(size_t idx) {
-  if (idx<_events.size()) {
+  if (int(idx) < _events.size()) {
     beginRemoveRows(QModelIndex(), idx, idx);
     _events.remove(idx, 1);
     _updateSchedule();
@@ -273,14 +273,13 @@ LocalSchedule::LocalSchedule(const QString &path, QObject *parent)
   }
 
   QJsonArray array = doc.array();
-  QJsonArray::iterator item = array.begin();
-  for (; item != array.end(); item++) {
-    if (! item->isObject()) {
+  for (int i=0; i < array.size(); i++) {
+    if (! array.at(i).isObject()) {
       logWarning() << "Cannot read event from schedule " << _filename
                    << ": Item is not an object.";
       continue;
     }
-    ScheduledEvent evt(item->toObject());
+    ScheduledEvent evt(array.at(i).toObject());
     if (! evt.isValid()) {
       logWarning() << "Cannot read event from schedule " << _filename
                    << ": Item is malformed.";
@@ -299,7 +298,7 @@ bool
 LocalSchedule::save() {
   logDebug() << "Save local schedule to " << _filename << ".";
   QJsonArray events;
-  for (size_t i=0; i<_events.size(); i++) {
+  for (int i=0; i<_events.size(); i++) {
     if (_events[i].isValid()) {
       events.append(_events[i].toJson());
     }

@@ -131,7 +131,7 @@ StationList::numStations() const {
 
 bool
 StationList::hasStation(const Identifier &id) const {
-  for (size_t i=0; i<_stations.size(); i++) {
+  for (int i=0; i<_stations.size(); i++) {
     if (_stations[i].id() == id) {
       return true;
     }
@@ -161,7 +161,7 @@ StationList::station(const Identifier &id) {
 
 size_t
 StationList::indexOf(const Identifier &id) const {
-  for (size_t i=0; i<_stations.size(); i++) {
+  for (int i=0; i<_stations.size(); i++) {
     if (_stations[i].id() == id) { return i; }
   }
   return _stations.size();
