@@ -1,6 +1,7 @@
 #include "application.hh"
 #include "lib/station.hh"
 #include "lib/bootstraplist.hh"
+#include "settings.hh"
 #include <ovlnet/crypto.hh>
 #include <ovlnet/optionparser.hh>
 
@@ -34,6 +35,9 @@ Application::Application(int &argc, char *argv[])
     logError() << "Cannot create path " << _daemonDir.absolutePath();
     return;
   }
+
+  // Load settings
+  _settings = new Settings(_daemonDir.canonicalPath()+"/settings.json", this);
 
   // Create DHT instance
   _station = new Station(_daemonDir.canonicalPath(), "",

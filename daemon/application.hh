@@ -6,6 +6,7 @@
 
 
 class Station;
+class Settings;
 class Identity;
 
 
@@ -21,6 +22,7 @@ public:
 
 protected:
   Station *_station;
+  Settings *_settings;
   QDir _daemonDir;
 };
 

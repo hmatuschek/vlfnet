@@ -53,6 +53,7 @@ StationInfoQuery::_onNodeFound(const NodeItem &node) {
 
 void
 StationInfoQuery::_onConnectionEstablished() {
+  logDebug() << "Connection established: Request status.";
   _response = _connection->get("/status");
   connect(_response, SIGNAL(finished()), this, SLOT(_onResponseReceived()));
   connect(_response, SIGNAL(error()), this, SLOT(_onError()));
@@ -70,6 +71,7 @@ StationInfoQuery::_onResponseReceived() {
   }
 
   _responseLength = _response->responseHeader("Content-Length").toUInt();
+  logDebug() << "Receive " << _responseLength << "b response.";
   connect(_response, SIGNAL(readyRead()), this, SLOT(_onReadyRead()));
 }
 

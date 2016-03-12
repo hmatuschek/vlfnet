@@ -1,7 +1,7 @@
 set(VLF_DAEMON_SOURCES main.cc
-    application.cc)
+    application.cc settings.cc)
 set(VLF_DAEMON_MOC_HEADERS
-    application.hh)
+    application.hh settings.hh)
 set(VLF_DAEMON_HEADERS ${VLF_CLIENT_MOC_HEADERS}
     )
 
