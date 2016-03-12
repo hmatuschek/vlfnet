@@ -6,6 +6,7 @@
 #include <QDateTime>
 #include <QJsonArray>
 #include <QJsonObject>
+#include <QAbstractTableModel>
 #include <ovlnet/buckets.hh>
 #include "location.hh"
 
@@ -36,7 +37,11 @@ typedef struct __attribute__((packed)) {
 class DataSetFile
 {
 public:
+  DataSetFile();
   DataSetFile(const QString &filename);
+  DataSetFile(const DataSetFile &other);
+
+  DataSetFile &operator=(const DataSetFile &other);
 
   bool isValid() const;
 
@@ -66,20 +71,49 @@ protected:
 };
 
 
-class DataSetDir
+/** Implements the dataset database.
+ * This database is stored as a directory containing all datasets as separate files.
+ * The name of these files corresponds to the ID of the dataset. Upon construction, the DB
+ * reads the meta data from all datasets in the directory. */
+class DataSetDir: public QAbstractTableModel
 {
+  Q_OBJECT
+
 public:
+  /** Constructs the dataset database located at the specified @c directory. */
   explicit DataSetDir(const QString &directory);
 
-  bool addDataSet(const QString &name);
-  bool addDataSet(const Identifier &id);
+  /** Returns the path to the data directory. */
+  QString path() const;
+  /** Retunrs the number of datasets stored in the database. */
+  size_t numDatasets() const;
+  /** Returns @c true if the database contains the specified identifier. */
+  bool contains(const Identifier &id) const;
+  /** Return the @c DataSetFile for the specified dataset. */
+  DataSetFile dataset(const Identifier &id) const;
+  /** Adds a dataset to the database. The dataset must be present in the directory. */
+  bool addDataset(const QString &name);
+  /** Adds a dataset to the database. The dataset must be present in the directory. */
+  bool addDataset(const Identifier &id);
 
+  /** Reloads the database. */
   void reload();
 
+  /** Returns the database as a Json array. */
   QJsonArray toJson() const;
 
+  /* *** Implementation of QAbstactTableModel */
+  int rowCount(const QModelIndex &parent) const;
+  int columnCount(const QModelIndex &parent) const;
+  QVariant data(const QModelIndex &index, int role) const;
+  QVariant headerData(int section, Qt::Orientation orientation, int role) const;
+
 protected:
+  /** The database directory. */
   QDir _dir;
+  /** The vector of identifiers of all datasets in the database. */
+  QVector<Identifier> _datasetOrder;
+  /** The table mapping dataset identifier to datasets. */
   QHash<Identifier, DataSetFile> _datasets;
 };
 

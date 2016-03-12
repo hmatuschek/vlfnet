@@ -6,14 +6,14 @@
 #include <QDateTime>
 #include "audio.hh"
 #include "location.hh"
-
+#include "datasetfile.hh"
 
 class Receiver: public Audio
 {
   Q_OBJECT
 
 public:
-  Receiver(const Location &location, const QString &dataDir, const QAudioDeviceInfo &device, QObject *parent=0);
+  Receiver(const Location &location, DataSetDir &dataDir, const QAudioDeviceInfo &device, QObject *parent=0);
   virtual ~Receiver();
 
 public slots:
@@ -27,7 +27,7 @@ protected:
 protected:
   QTemporaryFile _tmpFile;
   size_t _samples;
-  QString _dataDir;
+  DataSetDir &_dataDir;
   QDateTime _startTime;
   Location _location;
 };

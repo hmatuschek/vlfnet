@@ -26,42 +26,10 @@ Application::Application(int &argc, char *argv[])
   if (! _clientDir.exists()) {
     _clientDir.mkpath(_clientDir.absolutePath());
   }
-  // Load or create identity
-  QString idFile(_clientDir.canonicalPath()+"/identity.pem");
-  if (!QFile::exists(idFile)) {
-    logInfo() << "No identity found -> create new identity.";
-    _identity = Identity::newIdentity();
-    if (_identity) { _identity->save(idFile); }
-  } else {
-    logDebug() << "Load identity from" << idFile;
-    _identity = Identity::load(idFile);
-  }
-  // check if Identity was loaded or created
-  if (0 == _identity) {
-    logError() << "Error while loading or creating identity.";
-    return;
-  }
-
-  Location location;
-  QString locFile(_clientDir.canonicalPath()+"/location.json");
-  if (QFile::exists(locFile)) {
-    location = Location::fromFile(locFile);
-  }
 
   // Create DHT instance
-  _station = new Station(*_identity, location,
-                         _clientDir.canonicalPath()+"/schedule.json",
-                         _clientDir.canonicalPath()+"/data/",
-                         "",
+  _station = new Station(_clientDir.canonicalPath(), "",
                          QHostAddress::Any, 7742, this);
-
-  // boostrap list
-  QList< QPair<QString, uint16_t> > boothost = BootstrapList::fromFile(
-        _clientDir.canonicalPath()+"/bootstrap.json");
-  QList<QPair<QString, uint16_t>>::iterator host = boothost.begin();
-  for (; host != boothost.end(); host++) {
-    _station->ping(host->first, host->second);
-  }
 }
 
 
@@ -73,23 +41,6 @@ Application::station() {
 LogModel &
 Application::log() {
   return *_logmodel;
-}
-
-Location
-Application::location() const {
-  return _station->location();
-}
-
-void
-Application::setLocation(const Location &location) {
-  _station->setLocation(location);
-  QFile locFile(_clientDir.canonicalPath()+"/location.json");
-  if (locFile.open(QIODevice::WriteOnly)) {
-    QJsonDocument doc(location.toJson());
-    locFile.write(doc.toJson());
-    locFile.flush();
-    locFile.close();
-  }
 }
 
 void

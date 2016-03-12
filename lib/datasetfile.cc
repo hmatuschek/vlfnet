@@ -1,8 +1,16 @@
 #include "datasetfile.hh"
+#include <netinet/in.h>
+
 
 /* ********************************************************************************************* *
  * Implementation of DataSetFile
  * ********************************************************************************************* */
+DataSetFile::DataSetFile()
+  : _filename(), _timestamp(), _numSamples(0), _sampleRate(0), _parents(), _datasets()
+{
+  // pass...
+}
+
 DataSetFile::DataSetFile(const QString &filename)
   : _filename(filename), _timestamp(), _numSamples(0), _sampleRate(0), _parents(),
     _datasets()
@@ -56,6 +64,24 @@ DataSetFile::DataSetFile(const QString &filename)
                        Location(header.latitude, header.latitude, header.height), offset));
     offset += _numSamples;
   }
+}
+
+DataSetFile::DataSetFile(const DataSetFile &other)
+  : _filename(other._filename), _timestamp(other._timestamp), _numSamples(other._numSamples),
+    _sampleRate(other._sampleRate), _parents(other._parents), _datasets(other._datasets)
+{
+  // pass...
+}
+
+DataSetFile &
+DataSetFile::operator =(const DataSetFile &other) {
+  _filename = other._filename;
+  _timestamp = other._timestamp;
+  _numSamples = other._numSamples;
+  _sampleRate = other._sampleRate;
+  _parents = other._parents;
+  _datasets = other._datasets;
+  return *this;
 }
 
 void
@@ -169,37 +195,69 @@ DataSetFile::toJson() const {
  * Implementation of DataSetDir
  * ********************************************************************************************* */
 DataSetDir::DataSetDir(const QString &directory)
-  : _dir(directory)
+  : _dir(directory), _datasetOrder(), _datasets()
 {
   reload();
 }
 
+QString DataSetDir::path() const {
+  return _dir.absolutePath();
+}
+
+size_t
+DataSetDir::numDatasets() const {
+  return _datasets.size();
+}
+
 bool
-DataSetDir::addDataSet(const Identifier &id) {
+DataSetDir::contains(const Identifier &id) const {
+  return _datasets.contains(id);
+}
+
+DataSetFile
+DataSetDir::dataset(const Identifier &id) const {
+  return _datasets[id];
+}
+
+bool
+DataSetDir::addDataset(const Identifier &id) {
   DataSetFile file(id.toBase32());
   if (! file.isValid()) { return false; }
+  if (_datasets.contains(id)) { return true; }
+  beginInsertRows(QModelIndex(), _datasetOrder.size(), _datasetOrder.size());
   _datasets.insert(id, file);
+  _datasetOrder.append(id);
+  endInsertRows();
   return true;
 }
 
 bool
-DataSetDir::addDataSet(const QString &name) {
+DataSetDir::addDataset(const QString &name) {
   Identifier id = Identifier::fromBase32(name);
   if (id.isValid()) {
-    return addDataSet(id);
+    return addDataset(id);
   }
   return false;
 }
 
 void
 DataSetDir::reload() {
+  // ensure data dir exists
+  if ( (! _dir.exists()) && (! _dir.mkpath(_dir.absolutePath())) ){
+    logError() << "Cannot create data directory: " << _dir.absolutePath() << ".";
+    return;
+  }
+  beginResetModel();
+  // Reload datasets
   _datasets.clear();
+  _datasetOrder.clear();
   _dir.refresh();
   // Get directory content
   QStringList content = _dir.entryList(QDir::Files|QDir::Readable);
   foreach(QString filename, content) {
-    addDataSet(filename);
+    addDataset(filename);
   }
+  endResetModel();
 }
 
 QJsonArray
@@ -210,4 +268,51 @@ DataSetDir::toJson() const {
     res.append(dataset->toJson());
   }
   return res;
+}
+
+int
+DataSetDir::rowCount(const QModelIndex &parent) const {
+  return _datasets.size();
+}
+
+int
+DataSetDir::columnCount(const QModelIndex &parent) const {
+  return 4;
+}
+
+QVariant
+DataSetDir::data(const QModelIndex &index, int role) const {
+  if (index.row() >= _datasets.size()) { return QVariant(); }
+  if (index.column() >= columnCount(index)) { return QVariant(); }
+  if (Qt::DisplayRole != role) { return QVariant(); }
+
+  if (0 == index.column()) {
+    return _datasets[_datasetOrder[index.row()]].datetime().toString();
+  } else if (1 == index.column()) {
+    return _datasetOrder[index.row()].toBase32();
+  } else if (2 == index.column()) {
+    return QString::number(_datasets[_datasetOrder[index.row()]].samples() /
+        _datasets[_datasetOrder[index.row()]].sampleRate());
+  } else if (3 == index.column()) {
+    return QString::number(_datasets[_datasetOrder[index.row()]].numDatasets());
+  }
+
+  return QVariant();
+}
+
+QVariant
+DataSetDir::headerData(int section, Qt::Orientation orientation, int role) const {
+  if (section >= 4) { return QVariant(); }
+  if (Qt::DisplayRole != role) { return QVariant(); }
+  if (Qt::Horizontal != orientation) { return QVariant(); }
+
+  switch (section) {
+    case 0: return tr("Timestamp");
+    case 1: return tr("Identifier");
+    case 2: return tr("Duration [s]");
+    case 3: return tr("Num. time series");
+    default: break;
+  }
+
+  return QVariant();
 }

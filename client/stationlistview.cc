@@ -43,7 +43,7 @@ StationListView::StationListView(Application &app, QWidget *parent)
   QTabWidget *tabs = new QTabWidget();
 
   _map = new OSMWidget();
-  _map->setLocation(_application.location());
+  _map->setLocation(_application.station().location());
 
   QTableView *lst = new QTableView();
   lst->setModel(&_application.station().stations());
@@ -134,17 +134,17 @@ StationListView::_onBootstrap() {
 
 void
 StationListView::_onEditLocation() {
-  LocationEditDialog dialog(_application.location());
+  LocationEditDialog dialog(_application.station().location());
   if (QDialog::Accepted != dialog.exec()) {
     return;
   }
 
-  _application.setLocation(dialog.location());
-  _map->setLocation(_application.location());
-  _locationLabel->setText(QString("<a href=\"#\">%1</a>").arg(_application.location().toString()));
+  _application.station().setLocation(dialog.location());
+  _map->setLocation(_application.station().location());
+  _locationLabel->setText(QString("<a href=\"#\">%1</a>").arg(_application.station().location().toString()));
 }
 
 void
 StationListView::_onMapLoaded(bool ok) {
-  _map->setLocation(_application.location());
+  _map->setLocation(_application.station().location());
 }

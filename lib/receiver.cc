@@ -4,7 +4,7 @@
 #include "datasetfile.hh"
 
 
-Receiver::Receiver(const Location &location, const QString &dataDir, const QAudioDeviceInfo &device, QObject *parent)
+Receiver::Receiver(const Location &location, DataSetDir &dataDir, const QAudioDeviceInfo &device, QObject *parent)
   : Audio(device, parent), _tmpFile(), _samples(0), _dataDir(dataDir)
 {
   // pass...
@@ -86,8 +86,8 @@ Receiver::save() {
   OVLHashFinal(&mdctx, (uint8_t *)hash);
 
   // Move to destination
-  tmpFile.copy(_dataDir+"/data/"+Identifier(hash).toBase32());
-  logDebug() << "Added dataset at " << _dataDir+"/data/"+Identifier(hash).toBase32();
+  tmpFile.copy(_dataDir.path()+Identifier(hash).toBase32());
+  logDebug() << "Added dataset at " << _dataDir.path()+Identifier(hash).toBase32();
   return true;
 }
 

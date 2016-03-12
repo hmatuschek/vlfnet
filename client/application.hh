@@ -22,9 +22,6 @@ public:
   /** Returns a weak reference to the log-message table model. */
   LogModel &log();
 
-  Location location() const;
-  void setLocation(const Location &location);
-
   void bootstrap(const QString &host, uint16_t port);
 
 protected:

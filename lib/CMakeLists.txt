@@ -1,9 +1,9 @@
-set(VLF_LIB_SOURCES location.cc bootstraplist.cc datasetfile.cc
-    station.cc stationlist.cc query.cc audio.cc schedule.cc receiver.cc)
+set(VLF_LIB_SOURCES location.cc bootstraplist.cc
+    station.cc stationlist.cc query.cc audio.cc schedule.cc receiver.cc datasetfile.cc)
 set(VLF_LIB_MOC_HEADERS
-    station.hh stationlist.hh query.hh audio.hh schedule.hh receiver.hh)
+    station.hh stationlist.hh query.hh audio.hh schedule.hh receiver.hh datasetfile.hh)
 set(VLF_LIB_HEADERS ${VLF_CLIENT_MOC_HEADERS}
-    location.hh bootstraplist.hh datasetfile.hh)
+    location.hh bootstraplist.hh )
 
 qt5_wrap_cpp(VLF_LIB_MOC_SOURCES ${VLF_LIB_MOC_HEADERS})
 

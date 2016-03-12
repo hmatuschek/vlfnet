@@ -22,7 +22,6 @@ public:
 protected:
   Station *_station;
   QDir _daemonDir;
-  Identity *_identity;
 };
 
 #endif // APPLICATION_HH

@@ -58,10 +58,6 @@ public:
   const StationItem &station(const Identifier &id) const;
   StationItem &station(const Identifier &id);
 
-  void addCandidate(const Identifier &id);
-  void contactStation(const NodeItem &node);
-  void contactStation(const Identifier &node);
-
   /* *** Implementation of QAbstractTableModel interface. *** */
   int rowCount(const QModelIndex &parent) const;
   int columnCount(const QModelIndex &parent) const;
@@ -70,7 +66,10 @@ public:
 
 protected slots:
   void updateStation(const StationItem &station);
+  void addCandidate(const Identifier &id);
   void addToCandidates(const QList<Identifier> &nodes);
+  void contactStation(const NodeItem &node);
+  void contactStation(const Identifier &node);
 
 protected:
   size_t indexOf(const Identifier &id) const;
