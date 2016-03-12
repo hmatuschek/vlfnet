@@ -64,9 +64,11 @@ Application::station() {
 
 void
 Application::updateDDNS() {
-  QNetworkAccessManager net;
+  QNetworkAccessManager *net = new QNetworkAccessManager();
+  // self destruction
+  connect(net, SIGNAL(finished(QNetworkReply*)), net, SLOT(deleteLater()));
   // Just fire-up a request to the update URL
-  net.get(QNetworkRequest(QUrl(_settings->ddnsUpdateUrl())));
+  net->get(QNetworkRequest(QUrl(_settings->ddnsUpdateUrl())));
 }
 
 
