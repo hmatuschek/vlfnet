@@ -22,7 +22,7 @@ Application::Application(int &argc, char *argv[])
 
   // Determine default application data directory.
   _daemonDir = QStandardPaths::writableLocation(
-        QStandardPaths::AppDataLocation);
+        QStandardPaths::GenericDataLocation);
   // if config dir is passed by argument
   if (parser.hasOption("config-dir")) {
     _daemonDir = parser.option("config-dir");

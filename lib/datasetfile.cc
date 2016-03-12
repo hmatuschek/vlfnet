@@ -177,13 +177,13 @@ DataSetFile::toJson() const {
   res.insert("samplerate", int(_sampleRate));
   // assemble parent list
   QJsonArray parents;
-  for (size_t i=0; i<_parents.size(); i++) {
+  for (int i=0; i<_parents.size(); i++) {
     parents.append(_parents[i].toBase32());
   }
   res.insert("parents", parents);
   // Assemble list of datasets
   QJsonArray datasets;
-  for (size_t i=0; i<_datasets.size(); i++) {
+  for (int i=0; i<_datasets.size(); i++) {
     datasets.append(_datasets[i].first.toJson());
   }
   res.insert("timeseries", datasets);
