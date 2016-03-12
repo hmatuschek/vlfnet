@@ -3,6 +3,7 @@
 
 #include <QCoreApplication>
 #include <QDir>
+#include <QTimer>
 
 
 class Station;
@@ -20,10 +21,14 @@ public:
 
   Station &station();
 
+protected slots:
+  void updateDDNS();
+
 protected:
   Station *_station;
   Settings *_settings;
   QDir _daemonDir;
+  QTimer _ddnsTimer;
 };
 
 #endif // APPLICATION_HH

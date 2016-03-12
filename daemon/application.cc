@@ -6,10 +6,11 @@
 #include <ovlnet/optionparser.hh>
 
 #include <QStandardPaths>
-
+#include <QNetworkAccessManager>
+#include <QNetworkRequest>
 
 Application::Application(int &argc, char *argv[])
-  : QCoreApplication(argc, argv), _station(0)
+  : QCoreApplication(argc, argv), _station(0), _settings(0), _ddnsTimer()
 {
   // Set application name
   setApplicationName("vlfdaemon");
@@ -42,6 +43,14 @@ Application::Application(int &argc, char *argv[])
   // Create DHT instance
   _station = new Station(_daemonDir.canonicalPath(), "",
                          QHostAddress::Any, 7741, this);
+
+  // DDNS stuff (update every hour)
+  _ddnsTimer.setInterval(360000);
+  if (_settings->hasDDNSUpdateUrl()) {
+    connect(&_ddnsTimer, SIGNAL(timeout()), this, SLOT(updateDDNS()));
+    _ddnsTimer.start();
+    updateDDNS();
+  }
 }
 
 Application::~Application() {
@@ -53,5 +62,11 @@ Application::station() {
   return *_station;
 }
 
+void
+Application::updateDDNS() {
+  QNetworkAccessManager net;
+  // Just fire-up a request to the update URL
+  net.get(QNetworkRequest(QUrl(_settings->ddnsUpdateUrl())));
+}
 
 
