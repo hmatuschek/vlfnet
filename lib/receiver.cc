@@ -2,7 +2,7 @@
 #include <ovlnet/crypto.hh>
 #include <QDateTime>
 #include "datasetfile.hh"
-
+#include <netinet/in.h>
 
 Receiver::Receiver(const Location &location, DataSetDir &dataDir, const QAudioDeviceInfo &device, QObject *parent)
   : Audio(device, parent), _tmpFile(), _samples(0), _dataDir(dataDir)
