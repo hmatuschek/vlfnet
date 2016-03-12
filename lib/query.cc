@@ -73,6 +73,7 @@ StationInfoQuery::_onResponseReceived() {
   _responseLength = _response->responseHeader("Content-Length").toUInt();
   logDebug() << "Receive " << _responseLength << "b response.";
   connect(_response, SIGNAL(readyRead()), this, SLOT(_onReadyRead()));
+  _onReadyRead();
 }
 
 void
