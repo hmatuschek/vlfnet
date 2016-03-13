@@ -92,7 +92,7 @@ public:
   StationScheduleQuery(Node &node, const NodeItem &remote);
 
 signals:
-  void stationScheduleReceived(const QList<ScheduledEvent> &events);
+  void stationScheduleReceived(const Identifier &remote, const QList<ScheduledEvent> &events);
   void failed();
 
 protected slots:

@@ -13,14 +13,16 @@
 
 #include "newscheduledeventdialog.hh"
 
-
-ScheduleView::ScheduleView(Application &app, QWidget *parent)
+/* ********************************************************************************************* *
+ * Implementation of LocalScheduleView
+ * ********************************************************************************************* */
+LocalScheduleView::LocalScheduleView(Application &app, QWidget *parent)
   : QWidget(parent), _application(app)
 {
-  _events = new QListView();
-  _events->setModel(&app.station().schedule());
-  _events->setSelectionMode(QAbstractItemView::SingleSelection);
-  _events->setStyleSheet("QListView { "
+  _localEvents = new QListView();
+  _localEvents->setModel(&app.station().schedule());
+  _localEvents->setSelectionMode(QAbstractItemView::SingleSelection);
+  _localEvents->setStyleSheet("QListView { "
                          " font-family: serif;"
                          " font-size:  18pt;"
                          "};");
@@ -36,7 +38,7 @@ ScheduleView::ScheduleView(Application &app, QWidget *parent)
 
   QVBoxLayout *layout = new QVBoxLayout();
   layout->addLayout(bbox, 0);
-  layout->addWidget(_events, 1);
+  layout->addWidget(_localEvents, 1);
 
   connect(add, SIGNAL(clicked(bool)), this, SLOT(_onAdd()));
   connect(rem, SIGNAL(clicked(bool)), this, SLOT(_onRem()));
@@ -45,7 +47,7 @@ ScheduleView::ScheduleView(Application &app, QWidget *parent)
 }
 
 void
-ScheduleView::_onAdd() {
+LocalScheduleView::_onAdd() {
 
   NewScheduledEventDialog dialog;
   if (QDialog::Accepted != dialog.exec()) {
@@ -68,9 +70,9 @@ ScheduleView::_onAdd() {
 }
 
 void
-ScheduleView::_onRem() {
+LocalScheduleView::_onRem() {
   // Get selected event
-  QModelIndex idx = _events->selectionModel()->currentIndex();
+  QModelIndex idx = _localEvents->selectionModel()->currentIndex();
   if (! idx.isValid()) {
     return;
   }
@@ -82,4 +84,53 @@ ScheduleView::_onRem() {
 
   _application.station().schedule().removeScheduledEvent(idx.row());
   _application.station().schedule().save();
+}
+
+
+/* ********************************************************************************************* *
+ * Implementation of RemoteScheduleView
+ * ********************************************************************************************* */
+RemoteScheduleView::RemoteScheduleView(Application &app, QWidget *parent)
+  : QWidget(parent), _application(app), _remoteSchedule(0)
+{
+  _remoteSchedule = new RemoteSchedule(app.station(), this);
+
+  _remoteEvents = new QListView();
+  _remoteEvents->setModel(_remoteSchedule);
+  _remoteEvents->setSelectionMode(QAbstractItemView::SingleSelection);
+  _remoteEvents->setStyleSheet(
+        "QListView { "
+        " font-family: serif;"
+        " font-size:  18pt;"
+        "};");
+
+  QPushButton *add = new QPushButton(tr("+"));
+  add->setToolTip(tr("Add an event to the schedule."));
+
+  QHBoxLayout *bbox = new QHBoxLayout();
+  bbox->addWidget(add);
+
+  QVBoxLayout *layout = new QVBoxLayout();
+  layout->addLayout(bbox, 0);
+  layout->addWidget(_remoteEvents, 1);
+
+  connect(add, SIGNAL(clicked(bool)), this, SLOT(_onAdd()));
+
+  setLayout(layout);
+}
+
+void
+RemoteScheduleView::_onAdd() {
+  // pass...
+}
+
+
+/* ********************************************************************************************* *
+ * Implementation of ScheduleView
+ * ********************************************************************************************* */
+ScheduleView::ScheduleView(Application &app, QWidget *parent)
+  : QTabWidget(parent)
+{
+  addTab(new LocalScheduleView(app), tr("Local Schedule"));
+  addTab(new RemoteScheduleView(app), tr("Remote Schedules"));
 }

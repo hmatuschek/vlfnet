@@ -5,6 +5,12 @@
 #include <QDateTime>
 #include <QVector>
 
+#include <ovlnet/buckets.hh>
+
+
+class Station;
+class StationItem;
+
 
 /** Represents a single or repeating event. */
 class ScheduledEvent
@@ -43,6 +49,9 @@ public:
   /** Serializes the event into a JSON object. */
   QJsonObject toJson() const;
 
+  bool operator==(const ScheduledEvent &other) const;
+  bool operator!=(const ScheduledEvent &other) const;
+
 protected:
   /** The type of the event. */
   Type _type;
@@ -51,7 +60,7 @@ protected:
 };
 
 
-class Schedule : public QAbstractListModel
+class Schedule: public QAbstractListModel
 {
   Q_OBJECT
 
@@ -60,6 +69,7 @@ public:
 
   size_t numEvents() const;
 
+  size_t add(const ScheduledEvent &event);
   size_t addSingle(const QDateTime &when);
   size_t addDaily(const QDateTime &first);
   size_t addWeekly(const QDateTime &first);
@@ -69,19 +79,21 @@ public:
 
   QDateTime next(const QDateTime &now) const;
 
+  virtual bool save();
+
   /* *** Implementation of QAbstractListModel interface. */
   int rowCount(const QModelIndex &parent) const;
   QVariant data(const QModelIndex &index, int role) const;
   QVariant headerData(int section, Qt::Orientation orientation, int role) const;
 
-  virtual bool save();
+public slots:
+  void checkSchedule();
 
 signals:
   void startRecording();
 
 protected slots:
   void _updateSchedule();
-  void _checkSchedule();
 
 protected:
   QDateTime _nextEvent;
@@ -100,6 +112,53 @@ public:
 
 protected:
   QString _filename;
+};
+
+
+class RemoteScheduledEvent: public ScheduledEvent
+{
+public:
+  /** Empty constructor. */
+  RemoteScheduledEvent();
+  /** Constructor for an event at the specified date and time. */
+  RemoteScheduledEvent(const Identifier &node, const QDateTime &first, ScheduledEvent::Type=SINGLE);
+  /** Copy constructor. */
+  RemoteScheduledEvent(const RemoteScheduledEvent &other);
+  RemoteScheduledEvent(const Identifier &node, const ScheduledEvent &obj);
+  /** Assignment operator. */
+  RemoteScheduledEvent &operator=(const RemoteScheduledEvent &other);
+
+  size_t numNodes() const;
+  const QSet<Identifier> &nodes() const;
+  void addNode(const Identifier &id);
+
+protected:
+  QSet<Identifier> _nodes;
+};
+
+
+class RemoteSchedule: public QAbstractListModel
+{
+  Q_OBJECT
+
+public:
+  explicit RemoteSchedule(Station &station, QObject *parent=0);
+
+  size_t numEvents() const;
+  const RemoteScheduledEvent &scheduledEvent(size_t i) const;
+  void add(const Identifier &node, const ScheduledEvent &obj);
+
+  /* *** Implementation of QAbstractListModel interface. */
+  int rowCount(const QModelIndex &parent) const;
+  QVariant data(const QModelIndex &index, int role) const;
+
+protected slots:
+  void _onUpdateStationSchedule(const StationItem &station);
+  void _onStationScheduleReceived(const Identifier &remote, const QList<ScheduledEvent> &events);
+
+protected:
+  Station &_station;
+  QVector<RemoteScheduledEvent> _events;
 };
 
 #endif // SCHEDULE_HH

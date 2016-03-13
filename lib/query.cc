@@ -282,7 +282,7 @@ StationScheduleQuery::_onReadyRead() {
         events.push_back(ScheduledEvent(array.at(i).toObject()));
       }
     }
-    emit stationScheduleReceived(events);
+    emit stationScheduleReceived(_connection->peerId(), events);
     deleteLater();
   }
 }

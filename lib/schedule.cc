@@ -1,4 +1,7 @@
 #include "schedule.hh"
+#include "station.hh"
+#include "stationlist.hh"
+#include "query.hh"
 #include <ovlnet/logger.hh>
 
 #include <QJsonObject>
@@ -30,7 +33,7 @@ ScheduledEvent::ScheduledEvent(const QJsonObject &obj)
   // Check if first event date-time is present
   if (! obj.contains("first")) { return; }
   // Read date-time as UTC
-  QDateTime first = QDateTime::fromString(obj.value("first").toString(), "YYYY-MM-dd hh:mm:ss");
+  QDateTime first = QDateTime::fromString(obj.value("first").toString(), "yyyy-MM-dd hh:mm:ss");
   if (! first.isValid()) { return; }
   // Specify that the given date time was in UTC
   first.setTimeSpec(Qt::UTC);
@@ -116,6 +119,18 @@ ScheduledEvent::toJson() const {
   return obj;
 }
 
+bool
+ScheduledEvent::operator ==(const ScheduledEvent &other) const {
+  if (_type != other._type) { return false; }
+  return _first == other._first;
+}
+
+bool
+ScheduledEvent::operator !=(const ScheduledEvent &other) const {
+  return !(*this == other);
+}
+
+
 /* ********************************************************************************************* *
  * Implementation of Schedule interface
  * ********************************************************************************************* */
@@ -143,33 +158,28 @@ Schedule::numEvents() const {
 }
 
 size_t
-Schedule::addSingle(const QDateTime &when) {
+Schedule::add(const ScheduledEvent &event) {
   size_t idx = _events.size();
   beginInsertRows(QModelIndex(), idx, idx);
-  _events.push_back(ScheduledEvent(when, ScheduledEvent::SINGLE));
+  _events.push_back(event);
   _updateSchedule();
   endInsertRows();
   return idx;
+}
+
+size_t
+Schedule::addSingle(const QDateTime &when) {
+  return add(ScheduledEvent(when, ScheduledEvent::SINGLE));
 }
 
 size_t
 Schedule::addDaily(const QDateTime &first) {
-  size_t idx = _events.size();
-  beginInsertRows(QModelIndex(), idx, idx);
-  _events.push_back(ScheduledEvent(first, ScheduledEvent::DAILY));
-  _updateSchedule();
-  endInsertRows();
-  return idx;
+  return add(ScheduledEvent(first, ScheduledEvent::DAILY));
 }
 
 size_t
 Schedule::addWeekly(const QDateTime &first) {
-  size_t idx = _events.size();
-  beginInsertRows(QModelIndex(), idx, idx);
-  _events.push_back(ScheduledEvent(first, ScheduledEvent::WEEKLY));
-  _updateSchedule();
-  endInsertRows();
-  return idx;
+  return add(ScheduledEvent(first, ScheduledEvent::WEEKLY));
 }
 
 const ScheduledEvent &
@@ -193,9 +203,10 @@ Schedule::_updateSchedule() {
 }
 
 void
-Schedule::_checkSchedule() {
+Schedule::checkSchedule() {
   if (_nextEvent.isValid() && (_nextEvent == QDateTime::currentDateTime())) {
     emit startRecording();
+    _updateSchedule();
   }
 }
 
@@ -319,3 +330,138 @@ LocalSchedule::save() {
   return true;
 }
 
+
+/* ********************************************************************************************* *
+ * Implementation of RemoteScheduledEvent
+ * ********************************************************************************************* */
+RemoteScheduledEvent::RemoteScheduledEvent()
+  : ScheduledEvent(), _nodes()
+{
+  // pass...
+}
+
+RemoteScheduledEvent::RemoteScheduledEvent(const Identifier &node, const QDateTime &first, ScheduledEvent::Type type)
+  : ScheduledEvent(first, type), _nodes()
+{
+  _nodes.insert(node);
+}
+
+RemoteScheduledEvent::RemoteScheduledEvent(const RemoteScheduledEvent &other)
+  : ScheduledEvent(other), _nodes(other._nodes)
+{
+  // pass...
+}
+
+RemoteScheduledEvent::RemoteScheduledEvent(const Identifier &node, const ScheduledEvent &obj)
+  : ScheduledEvent(obj), _nodes()
+{
+  _nodes.insert(node);
+}
+
+RemoteScheduledEvent &
+RemoteScheduledEvent::operator =(const RemoteScheduledEvent &other) {
+  ScheduledEvent::operator =(other);
+  _nodes = other._nodes;
+  return *this;
+}
+
+size_t
+RemoteScheduledEvent::numNodes() const {
+  return _nodes.size();
+}
+
+const QSet<Identifier> &
+RemoteScheduledEvent::nodes() const {
+  return _nodes;
+}
+
+void
+RemoteScheduledEvent::addNode(const Identifier &id) {
+  _nodes.insert(id);
+}
+
+
+/* ********************************************************************************************* *
+ * Implementation of RemoteSchedule
+ * ********************************************************************************************* */
+RemoteSchedule::RemoteSchedule(Station &station, QObject *parent)
+  : QAbstractListModel(parent), _station(station)
+{
+  connect(&_station.stations(), SIGNAL(stationUpdated(StationItem)),
+          this, SLOT(_onUpdateStationSchedule()));
+}
+
+size_t
+RemoteSchedule::numEvents() const {
+  return _events.size();
+}
+
+const RemoteScheduledEvent &
+RemoteSchedule::scheduledEvent(size_t i) const {
+  return _events[i];
+}
+
+void
+RemoteSchedule::add(const Identifier &node, const ScheduledEvent &obj) {
+  RemoteScheduledEvent evt(node, obj);
+  if (! evt.isValid()) { return; }
+
+  for (size_t i=0; i<_events.size(); i++) {
+    if (_events[i] == evt) {
+      emit dataChanged(index(i,0), index(i,0));
+      _events[i].addNode(node);
+      return;
+    }
+  }
+
+  beginInsertRows(QModelIndex(), _events.size(), _events.size());
+  _events.append(evt);
+  endInsertRows();
+}
+
+int
+RemoteSchedule::rowCount(const QModelIndex &parent) const {
+  return _events.size();
+}
+
+QVariant
+RemoteSchedule::data(const QModelIndex &index, int role) const {
+  if (index.row() >= _events.size()) { return QVariant(); }
+  if (Qt::DisplayRole != role) { return QVariant(); }
+
+  RemoteScheduledEvent evt = _events[index.row()];
+  if (ScheduledEvent::SINGLE == evt.type()) {
+    return tr("Once on %1 at %2 (%3 nodes)")
+        .arg(evt.first().date().toString())
+        .arg(evt.first().time().toString())
+        .arg(evt.numNodes());
+  } else if (ScheduledEvent::DAILY == evt.type()) {
+    return tr("Daily at %1 starting on %2 (%3 nodes)")
+        .arg(evt.first().time().toString())
+        .arg(evt.first().date().toString())
+        .arg(evt.numNodes());
+  } else if (ScheduledEvent::WEEKLY == evt.type()) {
+    return tr("Every %1 at %2 starting on %3 (%4 nodes)")
+        .arg(evt.first().date().dayOfWeek())
+        .arg(evt.first().time().toString())
+        .arg(evt.first().date().toString())
+        .arg(evt.numNodes());
+  }
+
+  return QVariant("Invalid.");
+}
+
+void
+RemoteSchedule::_onUpdateStationSchedule(const StationItem &station) {
+  StationScheduleQuery *query = new StationScheduleQuery(_station, station.node());
+  connect(query, SIGNAL(stationScheduleReceived(Identifier,QList<ScheduledEvent>)),
+          this, SLOT(_onStationScheduleReceived(Identifier,QList<ScheduledEvent>)));
+}
+
+void
+RemoteSchedule::_onStationScheduleReceived(const Identifier &remote, const QList<ScheduledEvent> &events) {
+  QList<ScheduledEvent>::const_iterator evt = events.begin();
+  for (; evt != events.end(); evt++) {
+    this->add(remote, *evt);
+  }
+}

@@ -2,16 +2,20 @@
 #define SCHEDULEVIEW_HH
 
 #include <QWidget>
+#include <QTabWidget>
+
 
 class Application;
 class QListView;
+class RemoteSchedule;
 
-class ScheduleView : public QWidget
+
+class LocalScheduleView : public QWidget
 {
   Q_OBJECT
 
 public:
-  explicit ScheduleView(Application &app, QWidget *parent = 0);
+  explicit LocalScheduleView(Application &app, QWidget *parent = 0);
 
 protected slots:
   void _onAdd();
@@ -19,7 +23,33 @@ protected slots:
 
 protected:
   Application &_application;
-  QListView *_events;
+  QListView *_localEvents;
+};
+
+
+class RemoteScheduleView : public QWidget
+{
+  Q_OBJECT
+
+public:
+  explicit RemoteScheduleView(Application &app, QWidget *parent = 0);
+
+protected slots:
+  void _onAdd();
+
+protected:
+  Application &_application;
+  RemoteSchedule *_remoteSchedule;
+  QListView *_remoteEvents;
+};
+
+
+class ScheduleView: public QTabWidget
+{
+  Q_OBJECT;
+
+public:
+  explicit ScheduleView(Application &app, QWidget *parent=0);
 };
 
 #endif // SCHEDULEVIEW_HH
