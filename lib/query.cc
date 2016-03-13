@@ -22,7 +22,8 @@ StationResolveQuery::succeeded() {
 void
 StationResolveQuery::failed() {
   emit notFound();
-  SearchQuery::failed();
+  //SearchQuery::failed();
+  this->deleteLater();
 }
 
 

@@ -242,6 +242,7 @@ StationList::_onUpdateNetwork() {
     contactStation(_stations[idx].id());
     // and get station list
     StationListQuery *query = new StationListQuery(_station, _stations[idx].id());
+    if ()
     connect(query, SIGNAL(stationListReceived(QList<Identifier>)),
             this, SLOT(addToCandidates(QList<Identifier>)));
   }
