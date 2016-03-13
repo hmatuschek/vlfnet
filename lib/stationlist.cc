@@ -45,8 +45,12 @@ StationItem::StationItem(const NodeItem &node, const QJsonObject &obj)
     logDebug() << "Cannot construct StationItem from JSON document: No location specified.";
     _node = NodeItem(); return;
   }
+
   _location = Location(obj.value("location").toObject());
   _description = obj.value("description").toString();
+
+  logDebug() << "Got info for station " << _node.id() << " (" << _node.addr() << ":" << _node.port()
+             << ") @" << _location.longitude() << ", " << _location.latitude();
 }
 
 StationItem::StationItem(const StationItem &other)
@@ -205,6 +209,7 @@ StationList::updateStation(const StationItem &station) {
     _stations.append(station);
     endInsertRows();
   }
+  emit stationUpdated(station);
 }
 
 void

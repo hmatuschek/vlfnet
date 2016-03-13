@@ -64,6 +64,9 @@ public:
   QVariant data(const QModelIndex &index, int role) const;
   QVariant headerData(int section, Qt::Orientation orientation, int role) const;
 
+signals:
+  void stationUpdated(const StationItem &item);
+
 protected slots:
   void updateStation(const StationItem &station);
   void addCandidate(const Identifier &id);

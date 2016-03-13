@@ -6,6 +6,8 @@
 OSMWidget::OSMWidget(QWidget *parent)
   : QWebView(parent)
 {
+  QWebSettings::globalSettings()->setAttribute(QWebSettings::DeveloperExtrasEnabled, true);
+
   QFile file("://stations_map.html");
   if (file.open(QIODevice::ReadOnly)) {
     setHtml(file.readAll());
@@ -21,6 +23,10 @@ OSMWidget::setLocation(const Location &location) {
 }
 
 void
-OSMWidget::addStation(const Identifier &id, const Location &location) {
-
+OSMWidget::addStation(const StationItem &station) {
+  page()->mainFrame()->evaluateJavaScript(
+        QString("addStation(\"%1\", %2, %3)")
+        .arg(station.id().toBase32())
+        .arg(station.location().longitude())
+        .arg(station.location().latitude()));
 }

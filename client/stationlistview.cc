@@ -90,6 +90,8 @@ StationListView::StationListView(Application &app, QWidget *parent)
   connect(_locationLabel, SIGNAL(linkActivated(QString)), this, SLOT(_onEditLocation()));
   connect(_stateLabel, SIGNAL(linkActivated(QString)), this, SLOT(_onBootstrap()));
   connect(_map, SIGNAL(loadFinished(bool)), this, SLOT(_onMapLoaded(bool)));
+  connect(&_application.station().stations(), SIGNAL(stationUpdated(StationItem)),
+          _map, SLOT(addStation(StationItem)));
   _updateTimer.start();
 }
 

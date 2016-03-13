@@ -2,7 +2,7 @@
 #define OSMWIDGET_HH
 
 #include <QWebView>
-#include "lib/location.hh"
+#include "lib/stationlist.hh"
 #include <ovlnet/crypto.hh>
 
 class OSMWidget : public QWebView
@@ -14,7 +14,7 @@ public:
 
 public slots:
   void setLocation(const Location &location);
-  void addStation(const Identifier &id, const Location &location);
+  void addStation(const StationItem &station);
 };
 
 #endif // OSMWIDGET_HH

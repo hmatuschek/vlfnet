@@ -105,7 +105,8 @@ StationInfoQuery::_onReadyRead() {
     }
 
     StationItem item(NodeItem(_connection->peerId(), _connection->peer()), doc.object());
-    if (! item.isNull()) {
+    if (item.isNull()) {
+      qDebug() << "Station returned invalid status: " << doc.toJson();
       _onError(); return;
     }
 

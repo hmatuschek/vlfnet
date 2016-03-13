@@ -27,11 +27,11 @@
     function setLocal(lon, lat) {
       local.setLatLng([lon, lat]);
       map.setView([lon, lat]);
-    };
+    }
 
-    function setStation(id, lon, lat) {
+    function addStation(id, lon, lat) {
       if (id in stations) {
-        stations[id].setLatLng[lon, lat];
+        stations[id].setLatLng([lon, lat]);
       } else {
         stations[id] = L.marker([lon, lat]).addTo(map);
       }
