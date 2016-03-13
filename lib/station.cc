@@ -120,7 +120,7 @@ Station::processRequest(HttpRequest *request) {
     result.insert("location", location);
     // Send response as JSON
     return new HttpJsonResponse(QJsonDocument(result), request);
-  } else if ((HTTP_GET == request->method()) && ("/status" == request->uri().path())) {
+  } else if ((HTTP_GET == request->method()) && ("/list" == request->uri().path())) {
     // Handle stations list request
     QJsonArray stations;
     for (size_t i=0; i<_stations->numStations(); i++) {
