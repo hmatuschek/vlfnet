@@ -217,7 +217,10 @@ StationList::addToCandidates(const QList<Identifier> &nodes) {
   logDebug() << "Received list of " << nodes.size() << " station identifiers.";
   QList<Identifier>::const_iterator node = nodes.begin();
   for (; node != nodes.end(); node++) {
-    if (! hasStation(*node)) { _candidates.insert(*node); }
+    // only add new stations
+    if ((! hasStation(*node)) && (_station.id() != *node)) {
+      _candidates.insert(*node);
+    }
   }
 }
 
@@ -251,7 +254,7 @@ StationList::rowCount(const QModelIndex &parent) const {
 
 int
 StationList::columnCount(const QModelIndex &parent) const {
-  return 5;
+  return 6;
 }
 
 QVariant
@@ -269,6 +272,10 @@ StationList::data(const QModelIndex &index, int role) const {
     case 3:
       return _stations[index.row()].location().height();
     case 4:
+      return tr("%1 (%2) km")
+          .arg(QString::number(_stations[index.row()].location().arcDist(_station.location()), 'f', 1))
+          .arg(QString::number(_stations[index.row()].location().lineDist(_station.location()), 'f', 1));
+    case 5:
       return _stations[index.row()].description();
   }
 
@@ -284,7 +291,8 @@ StationList::headerData(int section, Qt::Orientation orientation, int role) cons
     case 1: return tr("Longitude");
     case 2: return tr("Latitude");
     case 3: return tr("Height");
-    case 4: return tr("Destription");
+    case 4: return tr("Distance");
+    case 5: return tr("Destription");
   }
   return QVariant();
 }

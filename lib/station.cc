@@ -20,7 +20,7 @@ Station::Station(const QString &path, const QString &audioDeviceName,
                  const QHostAddress &addr, uint16_t port, QObject *parent)
   : Node(path+"/identity.pem", addr, port, parent), HttpRequestHandler(), _path(path),
     _location(Location::fromFile(_path+"/location.json")), _stations(0),
-    _schedule(0), _datasets(0), _receiver(0), _ctrlWhitelist()
+    _schedule(0), _datasets(0), _receiver(0), _bootstrapTimer(), _ctrlWhitelist()
 {
   _stations = new StationList(*this);
   _schedule = new LocalSchedule(_path+"/schedule.json", this);
@@ -42,13 +42,16 @@ Station::Station(const QString &path, const QString &audioDeviceName,
   // Register service
   registerService("vlf::station", new HttpService(*this, this, this));
 
-  // boostrap list
-  QList< QPair<QString, uint16_t> > boothost = BootstrapList::fromFile(
-        _path+"/bootstrap.json");
-  QList<QPair<QString, uint16_t>>::iterator host = boothost.begin();
-  for (; host != boothost.end(); host++) {
-    ping(host->first, host->second);
-  }
+  // Setup boostrap timer
+  _bootstrapTimer.setInterval(60*1000);
+  _bootstrapTimer.setSingleShot(false);
+  connect(&_bootstrapTimer, SIGNAL(timeout()), this, SLOT(_onBootstrap()));
+  _bootstrapTimer.start();
+  // try to boostrap immediately
+  _onBootstrap();
+
+  connect(this, SIGNAL(connected()), this, SLOT(_onConnected()));
+  connect(this, SIGNAL(disconnected()), this, SLOT(_onDisconnected()));
 
   // Whenever a new node appears in the OVL network, check if this one is a Station (i.e. a
   // member of the VLF network).
@@ -145,6 +148,26 @@ Station::processRequest(HttpRequest *request) {
         request->version(), HTTP_NOT_FOUND, "Not found", request->socket());
 }
 
+void
+Station::_onBootstrap() {
+  // boostrap list
+  QList< QPair<QString, uint16_t> > boothost = BootstrapList::fromFile(
+        _path+"/bootstrap.json");
+  QList<QPair<QString, uint16_t>>::iterator host = boothost.begin();
+  for (; host != boothost.end(); host++) {
+    ping(host->first, host->second);
+  }
+}
+
+void
+Station::_onConnected() {
+  _bootstrapTimer.stop();
+}
+
+void
+Station::_onDisconnected() {
+  _bootstrapTimer.start();
+}
 
 /* ********************************************************************************************* *
  * Implementation of CtrlResponse

@@ -81,15 +81,26 @@ Location::height() const {
 }
 
 double
-Location::dist(const Location &other) {
-  double dx = _radius*std::sin(_longitude);
-  double dy = _radius*std::cos(_longitude);
-  double dz = _radius*std::sin(_latitude);
-  dx -= other._radius*std::sin(other._longitude);
-  dy -= other._radius*std::cos(other._longitude);
-  dz -= other._radius*std::sin(other._latitude);
+Location::lineDist(const Location &other) const {
+  double dx = _radius*std::cos(_latitude)*std::cos(_longitude);
+  double dy = _radius*std::sin(_latitude);
+  double dz = _radius*std::cos(_latitude)*std::sin(_longitude);
+  dx -= other._radius*std::cos(_latitude)*std::cos(other._longitude);
+  dy -= other._radius*std::sin(other._latitude);
+  dz -= other._radius*std::cos(_latitude)*std::sin(other._longitude);
   return std::sqrt(dx*dx + dy*dy + dz*dz);
 }
+
+double
+Location::arcDist(const Location &other) const {
+  const double R=6371.0088;
+  double sin_dlat = std::sin((_latitude-other._latitude)/2);
+  double sin_dlon = std::sin((_longitude-other._longitude)/2);
+  return 2*R*std::asin(
+        std::sqrt(
+          sin_dlat*sin_dlat + std::cos(_latitude)*std::cos(other._latitude)*sin_dlon*sin_dlon));
+}
+
 
 QString
 Location::toString() const {

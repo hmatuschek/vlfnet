@@ -4,6 +4,7 @@
 #include "stationlistview.hh"
 #include "monitor.hh"
 #include "scheduleview.hh"
+#include "aboutwidget.hh"
 #include <QTabWidget>
 #include <QTableView>
 
@@ -18,7 +19,7 @@ MainWindow::MainWindow(Application &app, QWidget *parent)
   tabs->addTab(new ScheduleView(_application), tr("Schedule"));
   tabs->addTab(new Monitor(_application), tr("Monitor"));
   tabs->addTab(new LogWidget(_application), tr("Log"));
-
+  tabs->addTab(new AboutWidget(), tr("About"));
   setCentralWidget(tabs);
 }
 

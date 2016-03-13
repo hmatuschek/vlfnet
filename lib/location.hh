@@ -27,7 +27,9 @@ public:
   double height() const;
 
   /** Direct distance between two points. */
-  double dist(const Location &other);
+  double lineDist(const Location &other) const;
+  /** Great circle distance between two points. */
+  double arcDist(const Location &other) const;
 
   QString toString() const;
   QJsonObject toJson() const;

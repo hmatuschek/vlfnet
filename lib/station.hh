@@ -39,6 +39,14 @@ public:
   /** Processes accepted HTTP requests. */
   HttpResponse *processRequest(HttpRequest *request);
 
+protected slots:
+  /** Gets called periodically until the node is connected to the network. */
+  void _onBootstrap();
+  /** Gets called once the connection to the network is lost. */
+  void _onDisconnected();
+  /** Gets called once the connection to the network is established. */
+  void _onConnected();
+
 protected:
   QString _path;
   /** My location. */
@@ -51,6 +59,8 @@ protected:
   DataSetDir *_datasets;
   /** The receiver. */
   Receiver *_receiver;
+  /** Timer to bootstrap the net on connection loss. */
+  QTimer _bootstrapTimer;
   /** Whitelist for the remote ctrl. */
   QSet<Identifier> _ctrlWhitelist;
 };

@@ -6,8 +6,6 @@
 OSMWidget::OSMWidget(QWidget *parent)
   : QWebView(parent)
 {
-  QWebSettings::globalSettings()->setAttribute(QWebSettings::DeveloperExtrasEnabled, true);
-
   QFile file("://stations_map.html");
   if (file.open(QIODevice::ReadOnly)) {
     setHtml(file.readAll());

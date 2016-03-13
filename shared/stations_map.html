@@ -25,15 +25,15 @@
     var stations = {};
 
     function setLocal(lon, lat) {
-      local.setLatLng([lon, lat]);
-      map.setView([lon, lat]);
+      local.setLatLng([lat, lon]);
+      map.setView([lat, lon]);
     }
 
     function addStation(id, lon, lat) {
       if (id in stations) {
-        stations[id].setLatLng([lon, lat]);
+        stations[id].setLatLng([lat, lon]);
       } else {
-        stations[id] = L.marker([lon, lat]).addTo(map);
+        stations[id] = L.marker([lat, lon]).addTo(map);
       }
     }
   </script>
