@@ -68,6 +68,7 @@ public:
   explicit Schedule(QObject *parent = 0);
 
   size_t numEvents() const;
+  bool contains(const ScheduledEvent &event) const;
 
   size_t add(const ScheduledEvent &event);
   size_t addSingle(const QDateTime &when);

@@ -13,6 +13,7 @@
 
 #include "newscheduledeventdialog.hh"
 
+
 /* ********************************************************************************************* *
  * Implementation of LocalScheduleView
  * ********************************************************************************************* */
@@ -121,7 +122,19 @@ RemoteScheduleView::RemoteScheduleView(Application &app, QWidget *parent)
 
 void
 RemoteScheduleView::_onAdd() {
-  // pass...
+  // Get selected event
+  QModelIndex idx = _remoteEvents->selectionModel()->currentIndex();
+  if (! idx.isValid()) {
+    return;
+  }
+
+  if (QMessageBox::Yes != QMessageBox::question(0, tr("Add event"), tr("Add selected event to local schedule?"),
+                                                QMessageBox::No, QMessageBox::Yes)) {
+    return;
+  }
+
+  _application.station().schedule().add(_remoteSchedule->scheduledEvent(idx.row()));
+  _application.station().schedule().save();
 }
 
 

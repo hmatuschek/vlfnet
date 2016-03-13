@@ -12,6 +12,23 @@
 #include <QFont>
 
 
+inline QString
+dayOfWeekName(int dow) {
+  switch (dow) {
+    case Qt::Monday: return QObject::tr("Monday");
+    case Qt::Tuesday: return QObject::tr("Tuesday");
+    case Qt::Wednesday: return QObject::tr("Wednesday");
+    case Qt::Thursday: return QObject::tr("Thursday");
+    case Qt::Friday: return QObject::tr("Friday");
+    case Qt::Saturday: return QObject::tr("Saturday");
+    case Qt::Sunday: return QObject::tr("Sunday");
+    default: break;
+  }
+  return "";
+}
+
+
+
 /* ********************************************************************************************* *
  * Implementation of ScheduledEvent interface
  * ********************************************************************************************* */
@@ -157,8 +174,19 @@ Schedule::numEvents() const {
   return _events.size();
 }
 
+bool
+Schedule::contains(const ScheduledEvent &event) const {
+  for (int i=0; i<_events.size(); i++) {
+    if (_events[i] == event) { return true; }
+  }
+  return false;
+}
+
 size_t
 Schedule::add(const ScheduledEvent &event) {
+  for (int i=0; i<_events.size(); i++) {
+    if (_events[i] == event) { return i; }
+  }
   size_t idx = _events.size();
   beginInsertRows(QModelIndex(), idx, idx);
   _events.push_back(event);
@@ -227,18 +255,18 @@ Schedule::data(const QModelIndex &index, int role) const {
 
   if (Qt::DisplayRole == role) {
     if (ScheduledEvent::SINGLE == evt.type()) {
-      return tr("Once on %1 at %2").arg(
-            evt.first().date().toString()).arg(
-            evt.first().time().toString());
+      return tr("Once on %1 at %2")
+          .arg(evt.first().date().toString())
+          .arg(evt.first().time().toString());
     } else if (ScheduledEvent::DAILY == evt.type()) {
-      return tr("Daily at %1 starting on %2").arg(
-            evt.first().time().toString()).arg(
-            evt.first().date().toString());
+      return tr("Daily at %1 starting on %2")
+          .arg(evt.first().time().toString())
+          .arg(evt.first().date().toString());
     } else if (ScheduledEvent::WEEKLY == evt.type()) {
-      return tr("Every %1 at %2 starting on %3").arg(
-            evt.first().date().dayOfWeek()).arg(
-            evt.first().time().toString()).arg(
-            evt.first().date().toString());
+      return tr("Every %1 at %2 starting on %3")
+          .arg(dayOfWeekName(evt.first().date().dayOfWeek()))
+          .arg(evt.first().time().toString())
+          .arg(evt.first().date().toString());
     }
 
     return QVariant("Invalid.");
@@ -442,7 +470,7 @@ RemoteSchedule::data(const QModelIndex &index, int role) const {
         .arg(evt.numNodes());
   } else if (ScheduledEvent::WEEKLY == evt.type()) {
     return tr("Every %1 at %2 starting on %3 (%4 nodes)")
-        .arg(evt.first().date().dayOfWeek())
+        .arg(dayOfWeekName(evt.first().date().dayOfWeek()))
         .arg(evt.first().time().toString())
         .arg(evt.first().date().toString())
         .arg(evt.numNodes());
@@ -464,7 +492,6 @@ RemoteSchedule::_onStationScheduleReceived(const Identifier &remote, const QList
   logDebug() << "Station schedule received...";
   QList<ScheduledEvent>::const_iterator evt = events.begin();
   for (; evt != events.end(); evt++) {
-    logDebug() << "Add event " << QJsonDocument(evt->toJson()).toJson();
     this->add(remote, *evt);
   }
 }
