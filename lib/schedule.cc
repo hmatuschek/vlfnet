@@ -110,7 +110,7 @@ ScheduledEvent::first() const {
 QJsonObject
 ScheduledEvent::toJson() const {
   QJsonObject obj;
-  obj.insert("first", _first.toUTC().toString("YYYY-MM-dd hh:mm:ss"));
+  obj.insert("first", _first.toUTC().toString("yyyy-MM-dd hh:mm:ss"));
   switch (_type) {
     case SINGLE: obj.insert("repeat", "never"); break;
     case DAILY: obj.insert("repeat", "daily"); break;
@@ -388,7 +388,7 @@ RemoteSchedule::RemoteSchedule(Station &station, QObject *parent)
   : QAbstractListModel(parent), _station(station)
 {
   connect(&_station.stations(), SIGNAL(stationUpdated(StationItem)),
-          this, SLOT(_onUpdateStationSchedule()));
+          this, SLOT(_onUpdateStationSchedule(StationItem)));
 }
 
 size_t
@@ -406,7 +406,7 @@ RemoteSchedule::add(const Identifier &node, const ScheduledEvent &obj) {
   RemoteScheduledEvent evt(node, obj);
   if (! evt.isValid()) { return; }
 
-  for (size_t i=0; i<_events.size(); i++) {
+  for (int i=0; i<_events.size(); i++) {
     if (_events[i] == evt) {
       emit dataChanged(index(i,0), index(i,0));
       _events[i].addNode(node);
@@ -453,6 +453,7 @@ RemoteSchedule::data(const QModelIndex &index, int role) const {
 
 void
 RemoteSchedule::_onUpdateStationSchedule(const StationItem &station) {
+  logDebug() << "Station " << station.id() << " updated -> Update schedule.";
   StationScheduleQuery *query = new StationScheduleQuery(_station, station.node());
   connect(query, SIGNAL(stationScheduleReceived(Identifier,QList<ScheduledEvent>)),
           this, SLOT(_onStationScheduleReceived(Identifier,QList<ScheduledEvent>)));
@@ -460,8 +461,10 @@ RemoteSchedule::_onUpdateStationSchedule(const StationItem &station) {
 
 void
 RemoteSchedule::_onStationScheduleReceived(const Identifier &remote, const QList<ScheduledEvent> &events) {
+  logDebug() << "Station schedule received...";
   QList<ScheduledEvent>::const_iterator evt = events.begin();
   for (; evt != events.end(); evt++) {
+    logDebug() << "Add event " << QJsonDocument(evt->toJson()).toJson();
     this->add(remote, *evt);
   }
 }

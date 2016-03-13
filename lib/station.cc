@@ -155,6 +155,7 @@ Station::_onBootstrap() {
         _path+"/bootstrap.json");
   QList<QPair<QString, uint16_t>>::iterator host = boothost.begin();
   for (; host != boothost.end(); host++) {
+    logDebug() << "Try to bootstrap network with " << host->first << ": " << host->second << ".";
     ping(host->first, host->second);
   }
 }

@@ -105,7 +105,7 @@ RemoteScheduleView::RemoteScheduleView(Application &app, QWidget *parent)
         "};");
 
   QPushButton *add = new QPushButton(tr("+"));
-  add->setToolTip(tr("Add an event to the schedule."));
+  add->setToolTip(tr("Add the selected remote event to the local schedule."));
 
   QHBoxLayout *bbox = new QHBoxLayout();
   bbox->addWidget(add);

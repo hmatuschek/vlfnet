@@ -209,6 +209,7 @@ StationList::updateStation(const StationItem &station) {
     _stations.append(station);
     endInsertRows();
   }
+  logDebug() << "Station " << station.id() << ": Status updated.";
   emit stationUpdated(station);
 }
 
