@@ -23,10 +23,6 @@ LocalScheduleView::LocalScheduleView(Application &app, QWidget *parent)
   _localEvents = new QListView();
   _localEvents->setModel(&app.station().schedule());
   _localEvents->setSelectionMode(QAbstractItemView::SingleSelection);
-  _localEvents->setStyleSheet("QListView { "
-                         " font-family: serif;"
-                         " font-size:  18pt;"
-                         "};");
 
   QPushButton *add = new QPushButton(tr("+"));
   add->setToolTip(tr("Add an event to the schedule."));
@@ -99,11 +95,6 @@ RemoteScheduleView::RemoteScheduleView(Application &app, QWidget *parent)
   _remoteEvents = new QListView();
   _remoteEvents->setModel(_remoteSchedule);
   _remoteEvents->setSelectionMode(QAbstractItemView::SingleSelection);
-  _remoteEvents->setStyleSheet(
-        "QListView { "
-        " font-family: serif;"
-        " font-size:  18pt;"
-        "};");
 
   QPushButton *add = new QPushButton(tr("+"));
   add->setToolTip(tr("Add the selected remote event to the local schedule."));

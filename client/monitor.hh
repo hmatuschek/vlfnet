@@ -2,10 +2,12 @@
 #define MONITOR_HH
 
 #include <QWidget>
+#include <QAudioDeviceInfo>
 #include <fftw3.h>
 
 class Application;
 class Audio;
+
 
 /** Interface for all color maps. */
 class ColorMap
@@ -36,6 +38,7 @@ protected:
   double _max;
 };
 
+
 /** A simple gray-scale color map. */
 class GrayScaleColorMap: public ColorMap
 {
@@ -63,13 +66,15 @@ protected:
 };
 
 
-class Monitor : public QWidget
+class MonitorView : public QWidget
 {
   Q_OBJECT
 
 public:
-  explicit Monitor(Application &app, QWidget *parent = 0);
-  virtual ~Monitor();
+  explicit MonitorView(const QAudioDeviceInfo &device, Application &app, QWidget *parent = 0);
+  virtual ~MonitorView();
+
+  bool setDevice(const QAudioDeviceInfo &device);
 
 protected slots:
   void processStream(const int16_t *data, size_t len);
@@ -95,6 +100,23 @@ protected:
 
   LinearColorMap _colormap;
   QPixmap _plot;
+};
+
+
+class Monitor: public QWidget
+{
+  Q_OBJECT
+
+public:
+  explicit Monitor(Application &app, QWidget *parent=0);
+
+protected slots:
+  void deviceSelected(int idx);
+
+protected:
+  Application &_application;
+  QList<QAudioDeviceInfo> _devices;
+  MonitorView *_monitor;
 };
 
 #endif // MONITOR_HH

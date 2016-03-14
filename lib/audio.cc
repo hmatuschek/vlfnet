@@ -12,9 +12,9 @@ Audio::Audio(QObject *parent)
   format.setSampleType(QAudioFormat::SignedInt);
   format.setByteOrder(QAudioFormat::Endian(QSysInfo::ByteOrder));
 
-  QAudioDeviceInfo info = QAudioDeviceInfo::defaultInputDevice();
-  if (!info.isFormatSupported(format)) {
-    QAudioFormat near = info.nearestFormat(format);
+  _device = QAudioDeviceInfo::defaultInputDevice();
+  if (!_device.isFormatSupported(format)) {
+    QAudioFormat near = _device.nearestFormat(format);
     logError() << "Default format not supported try to use nearest: "
                << near.sampleRate() << " Hz, "
                << near.channelCount() << " channels, "
@@ -24,13 +24,47 @@ Audio::Audio(QObject *parent)
     return;
   }
 
-  _input = new QAudioInput(format, this);
+  _input = new QAudioInput(_device, format, this);
   //_input->setBufferSize(1024);
 }
 
 Audio::Audio(const QAudioDeviceInfo &device, QObject *parent)
-  : QIODevice(parent), _input(0)
+  : QIODevice(parent), _device(device), _input(0)
 {
+  QAudioFormat format;
+  format.setSampleRate(46000);
+  format.setChannelCount(1);
+  format.setSampleSize(16);
+  format.setCodec("audio/pcm");
+  format.setSampleType(QAudioFormat::SignedInt);
+  format.setByteOrder(QAudioFormat::Endian(QSysInfo::ByteOrder));
+
+  if (! _device.isFormatSupported(format)) {
+    QAudioFormat near = device.nearestFormat(format);
+    logError() << "Default format not supported try to use nearest: "
+               << near.sampleRate() << " Hz, "
+               << near.channelCount() << " channels, "
+               << near.sampleSize() << "b, "
+               << ((QAudioFormat::LittleEndian==near.byteOrder()) ? "little" : "big") << "  endian, "
+               << near.sampleType() << " type.";
+    return;
+  }
+
+  _input = new QAudioInput(_device, format, this);
+}
+
+QAudioDeviceInfo
+Audio::device() const {
+  return _device;
+}
+
+bool
+Audio::setDevice(const QAudioDeviceInfo &device) {
+  if (ready()) {
+    this->stop();
+    delete _input;
+  }
+
   QAudioFormat format;
   format.setSampleRate(46000);
   format.setChannelCount(1);
@@ -47,10 +81,11 @@ Audio::Audio(const QAudioDeviceInfo &device, QObject *parent)
                << near.sampleSize() << "b, "
                << ((QAudioFormat::LittleEndian==near.byteOrder()) ? "little" : "big") << "  endian, "
                << near.sampleType() << " type.";
-    return;
+    return false;
   }
 
   _input = new QAudioInput(device, format, this);
+  return true;
 }
 
 bool

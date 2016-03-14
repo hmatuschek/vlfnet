@@ -9,6 +9,7 @@
 #include <QAbstractTableModel>
 #include <ovlnet/buckets.hh>
 #include "location.hh"
+#include "stationlist.hh"
 
 
 typedef struct __attribute__((packed)) {
@@ -116,5 +117,74 @@ protected:
   /** The table mapping dataset identifier to datasets. */
   QHash<Identifier, DataSetFile> _datasets;
 };
+
+
+class RemoteDataSet
+{
+public:
+  RemoteDataSet();
+  RemoteDataSet(const Identifier &remote, const QJsonObject &obj);
+  RemoteDataSet(const RemoteDataSet &other);
+
+  RemoteDataSet &operator =(const RemoteDataSet &other);
+
+  const QDateTime &datetime() const;
+
+  size_t samples() const;
+  size_t sampleRate() const;
+
+  size_t numParents() const;
+  const Identifier &parent(size_t i) const;
+  const QVector<Identifier> &parents() const;
+
+  size_t numDatasets() const;
+  const Location &location(size_t i) const;
+
+  size_t numRemotes() const;
+  void addRemote(const Identifier &remote);
+  const QSet<Identifier> &remotes() const;
+
+protected:
+  QDateTime _timestamp;
+  size_t _samples;
+  size_t _sampleRate;
+  QVector<Identifier> _parents;
+  QVector<Location> _timeseries;
+  QSet<Identifier> _remotes;
+};
+
+
+class RemoteDataSetList: public QAbstractTableModel
+{
+  Q_OBJECT
+
+public:
+  explicit RemoteDataSetList(Station &station, QObject *parent=0);
+
+  /** Retunrs the number of datasets stored in the database. */
+  size_t numDatasets() const;
+  /** Returns @c true if the database contains the specified identifier. */
+  bool contains(const Identifier &id) const;
+  /** Return the @c RemoteDataSet for the specified dataset id. */
+  RemoteDataSet dataset(const Identifier &id) const;
+
+  /* *** Implementation of QAbstractTableModel interface. *** */
+  int rowCount(const QModelIndex &parent) const;
+  int columnCount(const QModelIndex &parent) const;
+  QVariant data(const QModelIndex &index, int role) const;
+  QVariant headerData(int section, Qt::Orientation orientation, int role) const;
+
+public slots:
+  void add(const Identifier &remote, const QJsonObject &list);
+
+protected slots:
+  void _onUpdateRemoteDataSets(const StationItem &station);
+
+protected:
+  Station &_station;
+  QVector<Identifier> _datasetOrder;
+  QHash<Identifier, RemoteDataSet> _datasets;
+};
+
 
 #endif // DATASETFILE_HH

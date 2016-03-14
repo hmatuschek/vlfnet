@@ -4,9 +4,12 @@
 #include <QPainter>
 #include <QPaintEngine>
 #include <QFontMetrics>
+#include <QComboBox>
+#include <QVBoxLayout>
 
 #include <ovlnet/logger.hh>
 #include "lib/audio.hh"
+#include "lib/station.hh"
 #include <fftw3.h>
 #include <cmath>
 
@@ -85,15 +88,15 @@ LinearColorMap::map(const double &value) {
 
 
 /* ****************************************************************************************** *
- *  Implementation of Monitor
+ *  Implementation of MonitorView
  * ****************************************************************************************** */
-Monitor::Monitor(Application &app, QWidget *parent)
+MonitorView::MonitorView(const QAudioDeviceInfo &device, Application &app, QWidget *parent)
   : QWidget(parent), _application(app), _input(0), _fftInBuffer(0), _nFFTBuffer(0),
     _fftwOutBuffer(0), _psd(0), _psdSumCount(0),
     _colormap(QVector<QColor> {Qt::black, Qt::red, Qt::yellow, Qt::white}, DB_MIN, DB_MAX),
     _plot(N_PLOT, N_PLOT_HIST)
 {
-  _input = new Audio(this);
+  _input = new Audio(device, this);
 
   _fftInBuffer = new double[N_FFT]; _nFFTBuffer = N_FFT;
   _fftwOutBuffer = new double[N_FFT];
@@ -109,7 +112,7 @@ Monitor::Monitor(Application &app, QWidget *parent)
 
 }
 
-Monitor::~Monitor() {
+MonitorView::~MonitorView() {
   fftw_destroy_plan(_fft);
   if (_fftInBuffer)
     delete[] _fftInBuffer;
@@ -119,8 +122,13 @@ Monitor::~Monitor() {
     delete[] _psd;
 }
 
+bool
+MonitorView::setDevice(const QAudioDeviceInfo &device) {
+  return _input->setDevice(device);
+}
+
 void
-Monitor::processStream(const int16_t *data, size_t len) {
+MonitorView::processStream(const int16_t *data, size_t len) {
   while (len) {
     // Determine number of samples to store in buffer
     size_t n = std::min(len, _nFFTBuffer);
@@ -142,7 +150,7 @@ Monitor::processStream(const int16_t *data, size_t len) {
 }
 
 void
-Monitor::updatePSD() {
+MonitorView::updatePSD() {
   _psd[0] += _fftwOutBuffer[0]*_fftwOutBuffer[0];
   for (size_t i=1; i<N_PSD; i++) {
     _psd[i] +=
@@ -159,7 +167,7 @@ Monitor::updatePSD() {
 }
 
 void
-Monitor::updatePlot() {
+MonitorView::updatePlot() {
   QPainter painter(&_plot);
   painter.drawPixmap(0, 0, _plot, 0, 1, N_PLOT, N_PLOT_HIST);
   for (size_t i=1; i<N_PLOT; i++) {
@@ -173,7 +181,7 @@ Monitor::updatePlot() {
 }
 
 void
-Monitor::paintEvent(QPaintEvent *evt) {
+MonitorView::paintEvent(QPaintEvent *evt) {
   QPainter painter(this);
   painter.drawPixmap(0,0, width(), height(),
                      _plot, 0, 0, N_PLOT, N_PLOT_HIST);
@@ -181,7 +189,7 @@ Monitor::paintEvent(QPaintEvent *evt) {
 }
 
 void
-Monitor::drawKnownStations(QPainter &painter) {
+MonitorView::drawKnownStations(QPainter &painter) {
   double Fs=48e3, dF=Fs/N_FFT, F0=dF*PLOT_OFFSET;
   QMap<QString, double> stations;
   stations.insert("ALPHA",  14.880952e3);
@@ -205,4 +213,45 @@ Monitor::drawKnownStations(QPainter &painter) {
     int w = painter.fontMetrics().width(station.key());
     painter.drawText(x-w/2, height()-3, station.key());
   }
+}
+
+
+/* ****************************************************************************************** *
+ *  Implementation of Monitor
+ * ****************************************************************************************** */
+Monitor::Monitor(Application &app, QWidget *parent)
+  : QWidget(parent), _application(app), _devices(), _monitor(0)
+{
+  QComboBox *devices = new QComboBox();
+
+  _devices = QAudioDeviceInfo::availableDevices(QAudio::AudioInput);
+  // Add null-device
+  _devices.prepend(QAudioDeviceInfo());
+  QAudioDeviceInfo defaultDevice = _application.station().inputDevice();
+  QList<QAudioDeviceInfo>::iterator device = _devices.begin();
+  for (size_t i=0; device != _devices.end(); device++, i++) {
+    if (device->isNull())
+      devices->addItem("none", "");
+    else
+      devices->addItem(device->deviceName(), device->deviceName());
+    if (*device == defaultDevice) {
+      devices->setCurrentIndex(i);
+    }
+  }
+
+  _monitor = new MonitorView(defaultDevice, _application);
+
+  QVBoxLayout *layout = new QVBoxLayout();
+  layout->addWidget(devices);
+  layout->addWidget(_monitor);
+
+  setLayout(layout);
+
+  connect(devices, SIGNAL(currentIndexChanged(int)), this, SLOT(deviceSelected(int)));
+}
+
+void
+Monitor::deviceSelected(int idx) {
+  _monitor->setDevice(_devices.at(idx));
+  _application.station().setInputDevice(_devices.at(idx));
 }

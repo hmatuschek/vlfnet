@@ -1,11 +1,127 @@
 #include "receiver.hh"
 #include <ovlnet/crypto.hh>
 #include <QDateTime>
+#include <QJsonDocument>
+#include <QJsonParseError>
 #include "datasetfile.hh"
 #include <netinet/in.h>
 
-Receiver::Receiver(const Location &location, DataSetDir &dataDir, const QAudioDeviceInfo &device, QObject *parent)
-  : Audio(device, parent), _tmpFile(), _samples(0), _dataDir(dataDir)
+
+
+/* ********************************************************************************************* *
+ * Implementation of ReceiverConfig
+ * ********************************************************************************************* */
+ReceiverConfig::ReceiverConfig()
+  : _device()
+{
+  // pass...
+}
+
+ReceiverConfig::ReceiverConfig(const QString &filename)
+  : _device()
+{
+  QFile file(filename);
+  if (! file.open(QIODevice::ReadOnly)) {
+    logError() << "Cannot read receiver config from " << filename << ".";
+    return;
+  }
+  QJsonParseError err;
+  QJsonDocument doc = QJsonDocument::fromJson(file.readAll(), &err);
+  if (QJsonParseError::NoError != err.error) {
+    logError() << "Cannot parse receiver config from " << filename
+               << ": " << err.errorString() << ".";
+    return;
+  }
+  if (! doc.isObject()) {
+    logError() << "Cannot process reciever config from " << filename
+               << ": Not an object." << doc.toJson();
+    return;
+  }
+  QJsonObject obj = doc.object();
+  if (! obj.contains("device")) {
+    logError() << "No input device specified in receiver config " << filename << ".";
+    return;
+  }
+  QString deviceName = obj.value("device").toString();
+  if (deviceName.isEmpty()) { return; }
+  logDebug() << "Use device " << deviceName << " as receiver input device.";
+  QList<QAudioDeviceInfo> devices = QAudioDeviceInfo::availableDevices(QAudio::AudioInput);
+  foreach(QAudioDeviceInfo info, devices) {
+    if (info.deviceName() == deviceName) {
+      _device = info;
+      break;
+    }
+  }
+}
+
+ReceiverConfig::ReceiverConfig(const QJsonObject &obj)
+  : _device()
+{
+  if (! obj.contains("device")) {
+    logError() << "No input device specified in receiver config.";
+    return;
+  }
+  QString deviceName = obj.value("device").toString();
+  if (deviceName.isEmpty()) { return; }
+  QList<QAudioDeviceInfo> devices = QAudioDeviceInfo::availableDevices(QAudio::AudioInput);
+  foreach(QAudioDeviceInfo info, devices) {
+    if (info.deviceName() == deviceName) {
+      _device = info;
+      break;
+    }
+  }
+}
+
+ReceiverConfig::ReceiverConfig(const ReceiverConfig &other)
+  : _device(other._device)
+{
+  // pass...
+}
+
+ReceiverConfig &
+ReceiverConfig::operator =(const ReceiverConfig &other) {
+  _device = other._device;
+  return *this;
+}
+
+QJsonObject
+ReceiverConfig::toJson() const {
+  QJsonObject res;
+  res.insert("device", _device.deviceName());
+  return res;
+}
+
+bool
+ReceiverConfig::save(const QString &filename) const {
+  QJsonObject obj = toJson();
+  QFile file(filename);
+  if (! file.open(QIODevice::WriteOnly)) {
+    logError() << "Cannot save receiver config to " << filename << ".";
+    return false;
+  }
+  file.write(QJsonDocument(obj).toJson());
+  file.flush();
+  file.close();
+  logDebug() << "Saved receiver config in " << filename << ".";
+  return true;
+}
+
+const QAudioDeviceInfo &
+ReceiverConfig::device() const {
+  return _device;
+}
+
+void
+ReceiverConfig::setDevice(const QAudioDeviceInfo &device) {
+  _device = device;
+}
+
+
+/* ********************************************************************************************* *
+ * Implementation of Receiver
+ * ********************************************************************************************* */
+Receiver::Receiver(const Location &location, DataSetDir &dataDir, const ReceiverConfig &config, QObject *parent)
+  : Audio(config.device(), parent), _tmpFile(), _samples(0), _dataDir(dataDir)
 {
   // pass...
 }

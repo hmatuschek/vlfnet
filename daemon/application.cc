@@ -41,8 +41,7 @@ Application::Application(int &argc, char *argv[])
   _settings = new Settings(_daemonDir.canonicalPath()+"/settings.json", this);
 
   // Create DHT instance
-  _station = new Station(_daemonDir.canonicalPath(), "",
-                         QHostAddress::Any, 7741, this);
+  _station = new Station(_daemonDir.canonicalPath(), QHostAddress::Any, 7741, this);
 
   // DDNS stuff (update every hour)
   _ddnsTimer.setInterval(360000);

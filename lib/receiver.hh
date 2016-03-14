@@ -8,12 +8,34 @@
 #include "location.hh"
 #include "datasetfile.hh"
 
+
+class ReceiverConfig
+{
+public:
+  ReceiverConfig();
+  explicit ReceiverConfig(const QString &filename);
+  explicit ReceiverConfig(const QJsonObject &obj);
+  ReceiverConfig(const ReceiverConfig &other);
+
+  ReceiverConfig &operator =(const ReceiverConfig &other);
+
+  QJsonObject toJson() const;
+  bool save(const QString &filename) const;
+
+  const QAudioDeviceInfo &device() const;
+  void setDevice(const QAudioDeviceInfo &device);
+
+protected:
+  QAudioDeviceInfo _device;
+};
+
+
 class Receiver: public Audio
 {
   Q_OBJECT
 
 public:
-  Receiver(const Location &location, DataSetDir &dataDir, const QAudioDeviceInfo &device, QObject *parent=0);
+  Receiver(const Location &location, DataSetDir &dataDir, const ReceiverConfig &config, QObject *parent=0);
   virtual ~Receiver();
 
 public slots:

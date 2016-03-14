@@ -16,8 +16,7 @@
 /* ********************************************************************************************* *
  * Implementation of Station
  * ********************************************************************************************* */
-Station::Station(const QString &path, const QString &audioDeviceName,
-                 const QHostAddress &addr, uint16_t port, QObject *parent)
+Station::Station(const QString &path, const QHostAddress &addr, uint16_t port, QObject *parent)
   : Node(path+"/identity.pem", addr, port, parent), HttpRequestHandler(), _path(path),
     _location(Location::fromFile(_path+"/location.json")), _stations(0),
     _schedule(0), _datasets(0), _receiver(0), _bootstrapTimer(), _ctrlWhitelist()
@@ -26,18 +25,8 @@ Station::Station(const QString &path, const QString &audioDeviceName,
   _schedule = new LocalSchedule(_path+"/schedule.json", this);
   _datasets = new DataSetDir(_path+"/data");
 
-  // Find device by device name
-  if (audioDeviceName.length()) {
-    QList<QAudioDeviceInfo> devices = QAudioDeviceInfo::availableDevices(QAudio::AudioInput);
-    foreach(QAudioDeviceInfo info, devices) {
-      if (info.deviceName() == audioDeviceName) {
-        _receiver = new Receiver(_location, *_datasets, info, this);
-        break;
-      }
-    }
-  } else {
-    _receiver = new Receiver(_location, *_datasets, QAudioDeviceInfo::defaultInputDevice(), this);
-  }
+  // Create receiver...
+  _receiver = new Receiver(_location, *_datasets, ReceiverConfig(_path+"/receiver.json"), this);
 
   // Register service
   registerService("vlf::station", new HttpService(*this, this, this));
@@ -91,6 +80,20 @@ Station::datasets() {
   return *_datasets;
 }
 
+QAudioDeviceInfo
+Station::inputDevice() const {
+  return _receiver->device();
+}
+
+bool
+Station::setInputDevice(const QAudioDeviceInfo &device) {
+  _receiver->setDevice(device);
+  ReceiverConfig cfg;
+  cfg.setDevice(device);
+  cfg.save(_path+"/receiver.json");
+  return true;
+}
+
 bool
 Station::acceptReqest(HttpRequest *request) {
   if ((HTTP_GET == request->method()) && ("/status" == request->uri().path())) {
@@ -100,6 +103,9 @@ Station::acceptReqest(HttpRequest *request) {
     return true;
   }
   if ((HTTP_GET == request->method()) && ("/schedule" == request->uri().path())) {
+    return true;
+  }
+  if ((HTTP_GET == request->method()) && request->uri().path().startsWith("/data")) {
     return true;
   }
   if (request->uri().path().startsWith("/ctrl/") && _ctrlWhitelist.contains(request->remote().id())) {
@@ -137,6 +143,8 @@ Station::processRequest(HttpRequest *request) {
       schedule.append(_schedule->scheduledEvent(i).toJson());
     }
     return new HttpJsonResponse(QJsonDocument(schedule), request);
+  } else if ((HTTP_GET == request->method()) && ("/data" == request->uri().path())) {
+    return new HttpJsonResponse(QJsonDocument(_datasets->toJson()), request);
   } else if (request->uri().path().startsWith("/ctrl/") &&
              _ctrlWhitelist.contains(request->remote().id())) {
     // Handle CTRL requests

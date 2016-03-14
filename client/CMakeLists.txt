@@ -1,9 +1,9 @@
 set(VLF_CLIENT_SOURCES main.cc
     application.cc mainwindow.cc logwindow.cc stationlistview.cc monitor.cc scheduleview.cc
-    newscheduledeventdialog.cc locationeditdialog.cc osmwidget.cc aboutwidget.cc)
+    newscheduledeventdialog.cc locationeditdialog.cc osmwidget.cc aboutwidget.cc datasetlistview.cc)
 set(VLF_CLIENT_MOC_HEADERS
     application.hh mainwindow.hh logwindow.hh stationlistview.hh monitor.hh scheduleview.hh
-    newscheduledeventdialog.hh locationeditdialog.hh osmwidget.hh aboutwidget.hh)
+    newscheduledeventdialog.hh locationeditdialog.hh osmwidget.hh aboutwidget.hh datasetlistview.hh)
 set(VLF_CLIENT_HEADERS ${VLF_CLIENT_MOC_HEADERS}
     )
 

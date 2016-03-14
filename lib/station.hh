@@ -5,6 +5,7 @@
 #include <ovlnet/node.hh>
 #include <ovlnet/httpservice.hh>
 #include "datasetfile.hh"
+#include <QAudioDeviceInfo>
 
 class StationList;
 class Schedule;
@@ -16,9 +17,8 @@ class Station : public Node, public HttpRequestHandler
   Q_OBJECT
 
 public:
-  explicit Station(const QString &path, const QString &audioDeviceName="",
-                   const QHostAddress &addr=QHostAddress::Any, uint16_t port=7741,
-                   QObject *parent=0);
+  explicit Station(const QString &path, const QHostAddress &addr=QHostAddress::Any,
+                   uint16_t port=7741, QObject *parent=0);
 
   /** Returns the location of the station. */
   const Location &location() const;
@@ -33,6 +33,9 @@ public:
 
   /** Returns the datasets held by this station. */
   DataSetDir &datasets();
+
+  QAudioDeviceInfo inputDevice() const;
+  bool setInputDevice(const QAudioDeviceInfo &device);
 
   /** Filters HTTP requests. */
   bool acceptReqest(HttpRequest *request);

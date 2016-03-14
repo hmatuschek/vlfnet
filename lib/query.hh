@@ -25,7 +25,39 @@ signals:
 
 
 /** Self-destructing query for the station info. */
-class StationInfoQuery: public QObject
+class JsonQuery: public QObject
+{
+  Q_OBJECT
+
+public:
+  JsonQuery(const QString &path, Node &node, const Identifier &remote);
+  JsonQuery(const QString &path, Node &node, const NodeItem &remote);
+
+signals:
+  void failed();
+
+protected:
+  virtual void finished(const QJsonDocument &doc);
+
+protected slots:
+  void _onNodeFound(const NodeItem &node);
+  void _onConnectionEstablished();
+  void _onResponseReceived();
+  void _onError();
+  void _onReadyRead();
+
+protected:
+  QString _query;
+  Node &_node;
+  HttpClientConnection *_connection;
+  HttpClientResponse *_response;
+  size_t _responseLength;
+  QByteArray _buffer;
+};
+
+
+/** Self-destructing query for the station info. */
+class StationInfoQuery: public JsonQuery
 {
   Q_OBJECT
 
@@ -35,26 +67,14 @@ public:
 
 signals:
   void stationInfoReceived(const StationItem &station);
-  void failed();
-
-protected slots:
-  void _onNodeFound(const NodeItem &node);
-  void _onConnectionEstablished();
-  void _onResponseReceived();
-  void _onError();
-  void _onReadyRead();
 
 protected:
-  Node &_node;
-  HttpClientConnection *_connection;
-  HttpClientResponse *_response;
-  size_t _responseLength;
-  QByteArray _buffer;
+  void finished(const QJsonDocument &doc);
 };
 
 
 /** Self-destructing query for the list of stations from another station. */
-class StationListQuery: public QObject
+class StationListQuery: public JsonQuery
 {
   Q_OBJECT
 
@@ -64,26 +84,14 @@ public:
 
 signals:
   void stationListReceived(const QList<Identifier> &ids);
-  void failed();
-
-protected slots:
-  void _onNodeFound(const NodeItem &node);
-  void _onConnectionEstablished();
-  void _onResponseReceived();
-  void _onError();
-  void _onReadyRead();
 
 protected:
-  Node &_node;
-  HttpClientConnection *_connection;
-  HttpClientResponse *_response;
-  size_t _responseLength;
-  QByteArray _buffer;
+  void finished(const QJsonDocument &doc);
 };
 
 
 /** Self-destructing query for the station schedule. */
-class StationScheduleQuery: public QObject
+class StationScheduleQuery: public JsonQuery
 {
   Q_OBJECT
 
@@ -93,22 +101,25 @@ public:
 
 signals:
   void stationScheduleReceived(const Identifier &remote, const QList<ScheduledEvent> &events);
-  void failed();
-
-protected slots:
-  void _onNodeFound(const NodeItem &node);
-  void _onConnectionEstablished();
-  void _onResponseReceived();
-  void _onError();
-  void _onReadyRead();
 
 protected:
-  Node &_node;
-  HttpClientConnection *_connection;
-  HttpClientResponse *_response;
-  size_t _responseLength;
-  QByteArray _buffer;
+  void finished(const QJsonDocument &doc);
 };
 
+/** Self-destructing query for the dataset list. */
+class StationDataSetListQuery: public JsonQuery
+{
+  Q_OBJECT
+
+public:
+  StationDataSetListQuery(Node &node, const Identifier &remote);
+  StationDataSetListQuery(Node &node, const NodeItem &remote);
+
+signals:
+  void dataSetListReceived(const Identifier &remote, const QJsonObject &lst);
+
+protected:
+  void finished(const QJsonDocument &doc);
+};
 
 #endif // QUERY_HH

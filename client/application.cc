@@ -28,8 +28,7 @@ Application::Application(int &argc, char *argv[])
   }
 
   // Create DHT instance
-  _station = new Station(_clientDir.canonicalPath(), "",
-                         QHostAddress::Any, 7742, this);
+  _station = new Station(_clientDir.canonicalPath(), QHostAddress::Any, 7742, this);
 }
 
 

@@ -12,6 +12,9 @@ public:
   explicit Audio(QObject *parent=0);
   Audio(const QAudioDeviceInfo &device, QObject *parent=0);
 
+  QAudioDeviceInfo device() const;
+  bool setDevice(const QAudioDeviceInfo &device);
+
   bool ready() const;
 
 public slots:
@@ -27,6 +30,7 @@ protected:
   qint64 writeData(const char *data, qint64 len);
 
 protected:
+  QAudioDeviceInfo _device;
   QAudioInput *_input;
   int64_t _nSamples;
 };

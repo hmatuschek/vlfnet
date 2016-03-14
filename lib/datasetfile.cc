@@ -1,5 +1,7 @@
 #include "datasetfile.hh"
 #include <netinet/in.h>
+#include "query.hh"
+#include "station.hh"
 
 
 /* ********************************************************************************************* *
@@ -172,7 +174,7 @@ DataSetFile::readDataset(size_t i, int16_t *data) const {
 QJsonObject
 DataSetFile::toJson() const {
   QJsonObject res;
-  res.insert("timestamp", _timestamp.toUTC().toString("yyyy-MM-DD hh:mm:ss"));
+  res.insert("timestamp", _timestamp.toUTC().toString("yyyy-MM-dd hh:mm:ss"));
   res.insert("samples", int(_numSamples));
   res.insert("samplerate", int(_sampleRate));
   // assemble parent list
@@ -190,6 +192,7 @@ DataSetFile::toJson() const {
 
   return res;
 }
+
 
 /* ********************************************************************************************* *
  * Implementation of DataSetDir
@@ -315,4 +318,216 @@ DataSetDir::headerData(int section, Qt::Orientation orientation, int role) const
   }
 
   return QVariant();
+}
+
+
+/* ********************************************************************************************* *
+ * Implementation of RemoteDataSet
+ * ********************************************************************************************* */
+RemoteDataSet::RemoteDataSet()
+  : _timestamp(), _samples(0), _sampleRate(0), _parents(), _timeseries(), _remotes()
+{
+  // pass...
+}
+
+RemoteDataSet::RemoteDataSet(const Identifier &remote, const QJsonObject &obj)
+  : _timestamp(), _samples(0), _sampleRate(0), _parents(), _timeseries(), _remotes()
+{
+  _remotes.insert(remote);
+  if (obj.contains("timestamp")) {
+    QDateTime timestamp = QDateTime::fromString(obj.value("timestamp").toString(),"yyyy-MM-dd hh:mm:ss");
+    timestamp.setTimeSpec(Qt::UTC);
+    _timestamp = timestamp.toLocalTime();
+  }
+  if (obj.contains("samples")) {
+    _samples = obj.value("samples").toInt();
+  }
+  if (obj.contains("samplerate")) {
+    _sampleRate = obj.value("samplerate").toInt();
+  }
+  if (obj.contains("parents") && obj.value("parents").isArray()) {
+    QJsonArray parents = obj.value("parents").toArray();
+    for (int i=0; i<parents.size(); i++) {
+      _parents.append(Identifier::fromBase32(parents.at(i).toString()));
+    }
+  }
+  if (obj.contains("timeseries") && obj.value("timeseries").isArray()) {
+    QJsonArray timeseries = obj.value("timeseries").toArray();
+    for (int i=0; i<timeseries.size(); i++) {
+      Location location(timeseries.at(i).toObject());
+      if (! location.isNull())
+        _timeseries.append(location);
+    }
+  }
+}
+
+RemoteDataSet::RemoteDataSet(const RemoteDataSet &other)
+  : _timestamp(other._timestamp), _samples(other._samples), _sampleRate(other._sampleRate),
+    _parents(other._parents), _timeseries(other._timeseries), _remotes(other._remotes)
+{
+  // pass...
+}
+
+RemoteDataSet &
+RemoteDataSet::operator =(const RemoteDataSet &other) {
+  _timestamp = other._timestamp;
+  _samples = other._samples;
+  _sampleRate = other._sampleRate;
+  _parents = other._parents;
+  _timeseries = other._timeseries;
+  _remotes = other._remotes;
+  return *this;
+}
+
+const QDateTime &
+RemoteDataSet::datetime() const {
+  return _timestamp;
+}
+
+size_t
+RemoteDataSet::samples() const {
+  return _samples;
+}
+
+size_t
+RemoteDataSet::sampleRate() const {
+  return _sampleRate;
+}
+
+size_t
+RemoteDataSet::numParents() const {
+  return _parents.size();
+}
+
+const Identifier &
+RemoteDataSet::parent(size_t i) const {
+  return _parents[i];
+}
+
+const QVector<Identifier> &
+RemoteDataSet::parents() const {
+  return _parents;
+}
+
+size_t
+RemoteDataSet::numDatasets() const {
+  return _timeseries.size();
+}
+
+const Location &
+RemoteDataSet::location(size_t i) const {
+  return _timeseries[i];
+}
+
+size_t
+RemoteDataSet::numRemotes() const {
+  return _remotes.size();
+}
+
+void
+RemoteDataSet::addRemote(const Identifier &remote) {
+  _remotes.insert(remote);
+}
+
+const QSet<Identifier> &
+RemoteDataSet::remotes() const {
+  return _remotes;
+}
+
+
+/* ********************************************************************************************* *
+ * Implementation of RemoteDataSetList
+ * ********************************************************************************************* */
+RemoteDataSetList::RemoteDataSetList(Station &station, QObject *parent)
+  : QAbstractTableModel(parent), _station(station), _datasetOrder(), _datasets()
+{
+  // Get notified if a station got updated
+  connect(&_station.stations(), SIGNAL(stationUpdated(StationItem)),
+          this, SLOT(_onUpdateRemoteDataSets(StationItem)));
+}
+
+size_t
+RemoteDataSetList::numDatasets() const {
+  return _datasetOrder.size();
+}
+
+bool
+RemoteDataSetList::contains(const Identifier &id) const {
+  return _datasets.contains(id);
+}
+
+RemoteDataSet
+RemoteDataSetList::dataset(const Identifier &id) const {
+  return _datasets[id];
+}
+
+void
+RemoteDataSetList::add(const Identifier &remote, const QJsonObject &list) {
+  QJsonObject::const_iterator entry = list.begin();
+  for (; entry != list.end(); entry++) {
+    if (_datasets.contains(Identifier::fromBase32(entry.key()))) {
+      _datasets[Identifier::fromBase32(entry.key())].addRemote(remote);
+    } else {
+      _datasets.insert(Identifier::fromBase32(entry.key()),
+                       RemoteDataSet(remote, entry.value().toObject()));
+      _datasetOrder.append(Identifier::fromBase32(entry.key()));
+    }
+  }
+}
+
+int
+RemoteDataSetList::rowCount(const QModelIndex &parent) const {
+  return _datasetOrder.size();
+}
+
+int
+RemoteDataSetList::columnCount(const QModelIndex &parent) const {
+  return 5;
+}
+
+QVariant
+RemoteDataSetList::data(const QModelIndex &index, int role) const {
+  if (index.row() >= _datasetOrder.size()) { return QVariant(); }
+  if (index.column() >= columnCount(QModelIndex())) { return QVariant(); }
+  if (Qt::DisplayRole != role) { return QVariant(); }
+
+  RemoteDataSet dataset = _datasets[_datasetOrder[index.row()]];
+  if (0 == index.column()) {
+    return dataset.datetime().toString();
+  } else if (1 == index.column()) {
+    return _datasetOrder[index.row()].toBase32();
+  } else if (2 == index.column()) {
+    return QString::number(double(dataset.samples())/dataset.sampleRate(), 'f', '1');
+  } else if (3 == index.column()) {
+    return int(dataset.numDatasets());
+  } else if (4 == index.column()) {
+    return int(dataset.numRemotes());
+  }
+
+  return QVariant();
+}
+
+QVariant
+RemoteDataSetList::headerData(int section, Qt::Orientation orientation, int role) const {
+
+  if (section>=columnCount(QModelIndex())) { return QVariant(); }
+  if (Qt::Horizontal != orientation) { return QVariant(); }
+
+  switch (section) {
+    case 0: return tr("Timestamp");
+    case 1: return tr("Identifier");
+    case 2: return tr("Duration");
+    case 3: return tr("# Timeseries");
+    case 4: return tr("# Remotes");
+    default: break;
+  }
+
+  return QVariant();
+}
+
+void
+RemoteDataSetList::_onUpdateRemoteDataSets(const StationItem &station) {
+  StationDataSetListQuery *query = new StationDataSetListQuery(_station, station.node());
+  connect(query, SIGNAL(dataSetListReceived(Identifier,QJsonObject)),
+          this, SLOT(add(Identifier,QJsonObject)));
 }
