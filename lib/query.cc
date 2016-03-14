@@ -22,7 +22,6 @@ StationResolveQuery::succeeded() {
 void
 StationResolveQuery::failed() {
   emit notFound();
-  //SearchQuery::failed();
   this->deleteLater();
 }
 
@@ -46,6 +45,8 @@ JsonQuery::JsonQuery(const QString &path, Node &node, const NodeItem &remote)
 
 void
 JsonQuery::_onNodeFound(const NodeItem &node) {
+  logDebug() << "Try to connect station '" << node.id().toBase32()
+             << "' for '" << _query << "'.";
   _connection = new HttpClientConnection(_node, node, "vlf::station", this);
   connect(_connection, SIGNAL(established()), this, SLOT(_onConnectionEstablished()));
   connect(_connection, SIGNAL(error()), this, SLOT(_onError()));
@@ -53,9 +54,15 @@ JsonQuery::_onNodeFound(const NodeItem &node) {
 
 void
 JsonQuery::_onConnectionEstablished() {
+  logDebug() << "Try to query '" << _query << "' from station '" << _connection->peerId() << "'.";
+
   _response = _connection->get(_query);
-  connect(_response, SIGNAL(finished()), this, SLOT(_onResponseReceived()));
-  connect(_response, SIGNAL(error()), this, SLOT(_onError()));
+  if (_response) {
+    connect(_response, SIGNAL(finished()), this, SLOT(_onResponseReceived()));
+    connect(_response, SIGNAL(error()), this, SLOT(_onError()));
+  } else {
+    _onError();
+  }
 }
 
 void
@@ -75,7 +82,7 @@ JsonQuery::_onResponseReceived() {
 
 void
 JsonQuery::_onError() {
-  logDebug() << "Failed to access station.";
+  logDebug() << "Failed to access " << _query << ".";
   emit failed();
   deleteLater();
 }
@@ -183,7 +190,7 @@ StationScheduleQuery::StationScheduleQuery(Node &node, const Identifier &remote)
 StationScheduleQuery::StationScheduleQuery(Node &node, const NodeItem &remote)
   : JsonQuery("/schedule", node, remote)
 {
-  _onNodeFound(remote);
+  // pass...
 }
 
 void
@@ -217,13 +224,13 @@ StationDataSetListQuery::StationDataSetListQuery(Node &node, const Identifier &r
 StationDataSetListQuery::StationDataSetListQuery(Node &node, const NodeItem &remote)
   : JsonQuery("/data", node, remote)
 {
-  _onNodeFound(remote);
+  // pass...
 }
 
 void
 StationDataSetListQuery::finished(const QJsonDocument &doc) {
   if (! doc.isObject()) {
-    logDebug() << "Station returned invalid JSON description: Not an object.";
+    logDebug() << "Station returned invalid dataset list: Not an object.";
     _onError(); return;
   }
 

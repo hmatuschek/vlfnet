@@ -101,7 +101,7 @@ public:
   void reload();
 
   /** Returns the database as a Json array. */
-  QJsonArray toJson() const;
+  QJsonObject toJson() const;
 
   /* *** Implementation of QAbstactTableModel */
   int rowCount(const QModelIndex &parent) const;

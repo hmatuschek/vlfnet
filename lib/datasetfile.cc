@@ -263,12 +263,12 @@ DataSetDir::reload() {
   endResetModel();
 }
 
-QJsonArray
+QJsonObject
 DataSetDir::toJson() const {
-  QJsonArray res;
+  QJsonObject res;
   QHash<Identifier, DataSetFile>::const_iterator dataset = _datasets.begin();
   for (; dataset != _datasets.end(); dataset++) {
-    res.append(dataset->toJson());
+    res.insert(dataset.key().toBase32(), dataset->toJson());
   }
   return res;
 }
@@ -467,10 +467,14 @@ RemoteDataSetList::add(const Identifier &remote, const QJsonObject &list) {
   for (; entry != list.end(); entry++) {
     if (_datasets.contains(Identifier::fromBase32(entry.key()))) {
       _datasets[Identifier::fromBase32(entry.key())].addRemote(remote);
+      int idx = _datasetOrder.indexOf(Identifier::fromBase32(entry.key()));
+      emit dataChanged(index(idx, 0),index(idx, 4));
     } else {
+      beginInsertRows(QModelIndex(), _datasetOrder.size(), _datasetOrder.size());
       _datasets.insert(Identifier::fromBase32(entry.key()),
                        RemoteDataSet(remote, entry.value().toObject()));
       _datasetOrder.append(Identifier::fromBase32(entry.key()));
+      endInsertRows();
     }
   }
 }
@@ -527,6 +531,7 @@ RemoteDataSetList::headerData(int section, Qt::Orientation orientation, int role
 
 void
 RemoteDataSetList::_onUpdateRemoteDataSets(const StationItem &station) {
+  logDebug() << "Station " << station.id() << " updated -> Get dataset list.";
   StationDataSetListQuery *query = new StationDataSetListQuery(_station, station.node());
   connect(query, SIGNAL(dataSetListReceived(Identifier,QJsonObject)),
           this, SLOT(add(Identifier,QJsonObject)));

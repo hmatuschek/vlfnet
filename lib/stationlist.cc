@@ -241,6 +241,7 @@ StationList::_onUpdateNetwork() {
     // Update station
     contactStation(_stations[idx].id());
     // and get station list
+    logDebug() << "Update network: Query start list from " << _stations[idx].id();
     StationListQuery *query = new StationListQuery(_station, _stations[idx].id());
     connect(query, SIGNAL(stationListReceived(QList<Identifier>)),
             this, SLOT(addToCandidates(QList<Identifier>)));
