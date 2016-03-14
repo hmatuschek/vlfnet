@@ -1,7 +1,9 @@
 #include "query.hh"
+#include "station.hh"
 #include "stationlist.hh"
 #include <QJsonObject>
 #include <QJsonArray>
+#include <QTemporaryFile>
 
 
 /* ********************************************************************************************* *
@@ -45,8 +47,8 @@ JsonQuery::JsonQuery(const QString &path, Node &node, const NodeItem &remote)
 
 void
 JsonQuery::_onNodeFound(const NodeItem &node) {
-  logDebug() << "Try to connect station '" << node.id().toBase32()
-             << "' for '" << _query << "'.";
+  /*logDebug() << "Try to connect station '" << node.id().toBase32()
+             << "' for '" << _query << "'."; */
   _connection = new HttpClientConnection(_node, node, "vlf::station", this);
   connect(_connection, SIGNAL(established()), this, SLOT(_onConnectionEstablished()));
   connect(_connection, SIGNAL(error()), this, SLOT(_onError()));
@@ -54,8 +56,8 @@ JsonQuery::_onNodeFound(const NodeItem &node) {
 
 void
 JsonQuery::_onConnectionEstablished() {
-  logDebug() << "Try to query '" << _query << "' from station '" << _connection->peerId() << "'.";
-
+  /*logDebug() << "Try to query '" << _query
+             << "' from station '" << _connection->peerId() << "'."; */
   _response = _connection->get(_query);
   if (_response) {
     connect(_response, SIGNAL(finished()), this, SLOT(_onResponseReceived()));
@@ -215,26 +217,128 @@ StationScheduleQuery::finished(const QJsonDocument &doc) {
 /* ********************************************************************************************* *
  * Implementation of StationDataSetListQuery
  * ********************************************************************************************* */
-StationDataSetListQuery::StationDataSetListQuery(Node &node, const Identifier &remote)
+DataSetListQuery::DataSetListQuery(Node &node, const Identifier &remote)
   : JsonQuery("/data", node, remote)
 {
   // pass...
 }
 
-StationDataSetListQuery::StationDataSetListQuery(Node &node, const NodeItem &remote)
+DataSetListQuery::DataSetListQuery(Node &node, const NodeItem &remote)
   : JsonQuery("/data", node, remote)
 {
   // pass...
 }
 
 void
-StationDataSetListQuery::finished(const QJsonDocument &doc) {
+DataSetListQuery::finished(const QJsonDocument &doc) {
   if (! doc.isObject()) {
     logDebug() << "Station returned invalid dataset list: Not an object.";
     _onError(); return;
   }
-
+  logDebug() << "Dataset list received.";
   emit dataSetListReceived(_connection->peerId(), doc.object());
   JsonQuery::finished(doc);
 }
+
+
+/* ********************************************************************************************* *
+ * Implementation of DownloadDataSetQuery
+ * ********************************************************************************************* */
+DownloadDataSetQuery::DownloadDataSetQuery(const Identifier &dataSetId, const Identifier &remote,
+                                           Station &station)
+  : QObject(0), _station(station), _dataSetID(dataSetId)
+{
+  StationResolveQuery *query = new StationResolveQuery(_station, remote);
+  connect(query, SIGNAL(found(NodeItem)), this, SLOT(_onNodeFound(NodeItem)));
+  connect(query, SIGNAL(notFound()), this, SLOT(_onError()));
+}
+
+DownloadDataSetQuery::DownloadDataSetQuery(const Identifier &dataSetId, const NodeItem &remote,
+                                           Station &station)
+  : QObject(0), _station(station), _dataSetID(dataSetId)
+{
+  _onNodeFound(remote);
+}
+
+void
+DownloadDataSetQuery::_onNodeFound(const NodeItem &node) {
+  logDebug() << "Try to connect station '" << node.id()
+             << "' for dataset '" << _dataSetID << "'.";
+  _connection = new HttpClientConnection(_station, node, "vlf::station", this);
+  connect(_connection, SIGNAL(established()), this, SLOT(_onConnectionEstablished()));
+  connect(_connection, SIGNAL(error()), this, SLOT(_onError()));
+}
+
+void
+DownloadDataSetQuery::_onConnectionEstablished() {
+  logDebug() << "Try to download dataset '" << _dataSetID
+             << "' from station '" << _connection->peerId() << "'.";
+
+  _response = _connection->get("/data/"+_dataSetID.toBase32());
+  if (_response) {
+    connect(_response, SIGNAL(finished()), this, SLOT(_onResponseReceived()));
+    connect(_response, SIGNAL(error()), this, SLOT(_onError()));
+  } else {
+    _onError();
+  }
+}
+
+void
+DownloadDataSetQuery::_onResponseReceived() {
+  if (HTTP_OK != _response->responseCode()) {
+    logDebug() << "Cannot query dataset '" << _dataSetID
+               << "': Station returned " << _response->responseCode();
+    _onError();
+    return;
+  }
+  if (! _response->hasResponseHeader("Content-Length")) {
+    logDebug() << "Station response has no length!";
+    _onError(); return;
+  }
+
+  _responseLength = _response->responseHeader("Content-Length").toUInt();
+  _buffer.open();
+  OVLHashInit(&_mdctx);
+  connect(_response, SIGNAL(readyRead()), this, SLOT(_onReadyRead()));
+}
+
+void
+DownloadDataSetQuery::_onError() {
+  logDebug() << "Failed to access dataset '" << _dataSetID << "'.";
+  emit failed();
+  deleteLater();
+}
+
+void
+DownloadDataSetQuery::_onReadyRead() {
+  if (_responseLength) {
+    QByteArray tmp = _response->read(_responseLength);
+    if (tmp.size() != _buffer.write(tmp)) {
+      logError() << "Cannot write to temporary file " << _buffer.fileName() << ".";
+    }
+    OVLHashUpdate((const uint8_t *)tmp.constData(), tmp.size(), &_mdctx);
+    _responseLength -= tmp.size();
+  }
+
+  if (0 == _responseLength) {
+    _buffer.flush();
+    _buffer.close();
+    char hash[OVL_HASH_SIZE];
+    OVLHashFinal(&_mdctx, (uint8_t *)hash);
+    // Check hash
+    if (Identifier(hash) != _dataSetID) {
+      logError() << "Dataset ID '" << _dataSetID
+                 << "' does not match hash of downloaded dataset '" << Identifier(hash) << "'.";
+      _onError(); return;
+    }
+    if (! _buffer.copy(_station.datasets().path()+"/"+_dataSetID.toBase32())) {
+      logError() << "Failed to copy downloaded dataset file to '"
+                 << _station.datasets().path()+"/"+_dataSetID.toBase32() <<"'.";
+      _onError(); return;
+    }
+    _station.datasets().addDataset(_dataSetID);
+    emit succeeded();
+  }
+}
+
 

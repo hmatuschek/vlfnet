@@ -198,7 +198,7 @@ DataSetFile::toJson() const {
  * Implementation of DataSetDir
  * ********************************************************************************************* */
 DataSetDir::DataSetDir(const QString &directory)
-  : _dir(directory), _datasetOrder(), _datasets()
+  : _dir(directory), _datasetOrder(), _datasets(), _parents()
 {
   reload();
 }
@@ -217,6 +217,12 @@ DataSetDir::contains(const Identifier &id) const {
   return _datasets.contains(id);
 }
 
+bool
+DataSetDir::containsImplicitly(const Identifier &id) const {
+  if (_datasets.contains(id)) { return true; }
+  return _parents.contains(id);
+}
+
 DataSetFile
 DataSetDir::dataset(const Identifier &id) const {
   return _datasets[id];
@@ -231,6 +237,10 @@ DataSetDir::addDataset(const Identifier &id) {
   _datasets.insert(id, file);
   _datasetOrder.append(id);
   endInsertRows();
+  // Update implicit dataset list:
+  for (size_t i=0; i<file.numParents(); i++) {
+    _parents.insert(file.parent(i), id);
+  }
   return true;
 }
 
@@ -313,7 +323,7 @@ DataSetDir::headerData(int section, Qt::Orientation orientation, int role) const
     case 0: return tr("Timestamp");
     case 1: return tr("Identifier");
     case 2: return tr("Duration [s]");
-    case 3: return tr("Num. time series");
+    case 3: return tr("# Timeseries");
     default: break;
   }
 
@@ -516,11 +526,12 @@ RemoteDataSetList::headerData(int section, Qt::Orientation orientation, int role
 
   if (section>=columnCount(QModelIndex())) { return QVariant(); }
   if (Qt::Horizontal != orientation) { return QVariant(); }
+  if (Qt::DisplayRole != role) { return QVariant(); }
 
   switch (section) {
     case 0: return tr("Timestamp");
     case 1: return tr("Identifier");
-    case 2: return tr("Duration");
+    case 2: return tr("Duration [s]");
     case 3: return tr("# Timeseries");
     case 4: return tr("# Remotes");
     default: break;
@@ -532,7 +543,7 @@ RemoteDataSetList::headerData(int section, Qt::Orientation orientation, int role
 void
 RemoteDataSetList::_onUpdateRemoteDataSets(const StationItem &station) {
   logDebug() << "Station " << station.id() << " updated -> Get dataset list.";
-  StationDataSetListQuery *query = new StationDataSetListQuery(_station, station.node());
+  DataSetListQuery *query = new DataSetListQuery(_station, station.node());
   connect(query, SIGNAL(dataSetListReceived(Identifier,QJsonObject)),
           this, SLOT(add(Identifier,QJsonObject)));
 }

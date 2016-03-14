@@ -88,8 +88,12 @@ public:
   QString path() const;
   /** Retunrs the number of datasets stored in the database. */
   size_t numDatasets() const;
+
   /** Returns @c true if the database contains the specified identifier. */
   bool contains(const Identifier &id) const;
+  /** Returns @c true if the database contains the specified identifier implicitly. */
+  bool containsImplicitly(const Identifier &id) const;
+
   /** Return the @c DataSetFile for the specified dataset. */
   DataSetFile dataset(const Identifier &id) const;
   /** Adds a dataset to the database. The dataset must be present in the directory. */
@@ -116,6 +120,8 @@ protected:
   QVector<Identifier> _datasetOrder;
   /** The table mapping dataset identifier to datasets. */
   QHash<Identifier, DataSetFile> _datasets;
+  /** Reverse lookup table to match parents to derived datasets. */
+  QHash<Identifier, Identifier> _parents;
 };
 
 

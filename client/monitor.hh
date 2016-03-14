@@ -7,6 +7,7 @@
 
 class Application;
 class Audio;
+class QComboBox;
 
 
 /** Interface for all color maps. */
@@ -111,11 +112,13 @@ public:
   explicit Monitor(Application &app, QWidget *parent=0);
 
 protected slots:
-  void deviceSelected(int idx);
+  void _deviceSelected(int idx);
+  void _updateDeviceList();
 
 protected:
   Application &_application;
   QList<QAudioDeviceInfo> _devices;
+  QComboBox *_deviceList;
   MonitorView *_monitor;
 };
 

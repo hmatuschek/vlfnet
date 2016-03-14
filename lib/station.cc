@@ -144,7 +144,18 @@ Station::processRequest(HttpRequest *request) {
     }
     return new HttpJsonResponse(QJsonDocument(schedule), request);
   } else if ((HTTP_GET == request->method()) && ("/data" == request->uri().path())) {
+    // Handle dataset list queries
     return new HttpJsonResponse(QJsonDocument(_datasets->toJson()), request);
+  } else if ((HTTP_GET == request->method()) && request->uri().path().startsWith("/data")) {
+    // Handle data download queries
+    QString id = request->uri().path().mid(6);
+    if (! _datasets->contains(Identifier::fromBase32(id))) {
+      return new HttpStringResponse(request->version(), HTTP_NOT_FOUND, "Not found.",
+                                    request->socket());
+    }
+    // serve file
+    return new HttpFileResponse(
+          _datasets->dataset(Identifier::fromBase32(id)).filename(), request);
   } else if (request->uri().path().startsWith("/ctrl/") &&
              _ctrlWhitelist.contains(request->remote().id())) {
     // Handle CTRL requests

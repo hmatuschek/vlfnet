@@ -3,6 +3,7 @@
 
 #include <ovlnet/httpclient.hh>
 #include "schedule.hh"
+#include <QTemporaryFile>
 
 class StationItem;
 
@@ -107,19 +108,49 @@ protected:
 };
 
 /** Self-destructing query for the dataset list. */
-class StationDataSetListQuery: public JsonQuery
+class DataSetListQuery: public JsonQuery
 {
   Q_OBJECT
 
 public:
-  StationDataSetListQuery(Node &node, const Identifier &remote);
-  StationDataSetListQuery(Node &node, const NodeItem &remote);
+  DataSetListQuery(Node &node, const Identifier &remote);
+  DataSetListQuery(Node &node, const NodeItem &remote);
 
 signals:
   void dataSetListReceived(const Identifier &remote, const QJsonObject &lst);
 
 protected:
   void finished(const QJsonDocument &doc);
+};
+
+
+class DownloadDataSetQuery: public QObject
+{
+  Q_OBJECT
+
+public:
+  DownloadDataSetQuery(const Identifier &datasetid, const Identifier &remote, Station &station);
+  DownloadDataSetQuery(const Identifier &datasetid, const NodeItem &remote, Station &station);
+
+signals:
+  void succeeded();
+  void failed();
+
+protected slots:
+  void _onNodeFound(const NodeItem &node);
+  void _onConnectionEstablished();
+  void _onResponseReceived();
+  void _onError();
+  void _onReadyRead();
+
+protected:
+  Station &_station;
+  Identifier _dataSetID;
+  HttpClientConnection *_connection;
+  HttpClientResponse *_response;
+  size_t _responseLength;
+  QTemporaryFile _buffer;
+  EVP_MD_CTX _mdctx;
 };
 
 #endif // QUERY_HH

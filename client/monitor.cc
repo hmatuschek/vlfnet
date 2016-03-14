@@ -5,7 +5,9 @@
 #include <QPaintEngine>
 #include <QFontMetrics>
 #include <QComboBox>
+#include <QPushButton>
 #include <QVBoxLayout>
+#include <QHBoxLayout>
 
 #include <ovlnet/logger.hh>
 #include "lib/audio.hh"
@@ -124,7 +126,10 @@ MonitorView::~MonitorView() {
 
 bool
 MonitorView::setDevice(const QAudioDeviceInfo &device) {
-  return _input->setDevice(device);
+  if (_input->setDevice(device)) {
+    return _input->start();
+  }
+  return false;
 }
 
 void
@@ -222,8 +227,31 @@ MonitorView::drawKnownStations(QPainter &painter) {
 Monitor::Monitor(Application &app, QWidget *parent)
   : QWidget(parent), _application(app), _devices(), _monitor(0)
 {
-  QComboBox *devices = new QComboBox();
+  _deviceList = new QComboBox();
+  _updateDeviceList();
 
+  QPushButton *update = new QPushButton(tr("update"));
+
+  _monitor = new MonitorView(_devices.at(_deviceList->currentIndex()), _application);
+
+  QHBoxLayout *bbox = new QHBoxLayout();
+  bbox->addWidget(_deviceList, 1);
+  bbox->addWidget(update, 0);
+
+  QVBoxLayout *layout = new QVBoxLayout();
+  layout->addLayout(bbox);
+  layout->addWidget(_monitor);
+
+  setLayout(layout);
+
+  connect(_deviceList, SIGNAL(currentIndexChanged(int)), this, SLOT(_deviceSelected(int)));
+  connect(update, SIGNAL(clicked(bool)), this, SLOT(_updateDeviceList()));
+}
+
+void
+Monitor::_updateDeviceList() {
+  disconnect(_deviceList, SIGNAL(currentIndexChanged(int)), this, SLOT(_deviceSelected(int)));
+  _deviceList->clear();
   _devices = QAudioDeviceInfo::availableDevices(QAudio::AudioInput);
   // Add null-device
   _devices.prepend(QAudioDeviceInfo());
@@ -231,27 +259,18 @@ Monitor::Monitor(Application &app, QWidget *parent)
   QList<QAudioDeviceInfo>::iterator device = _devices.begin();
   for (size_t i=0; device != _devices.end(); device++, i++) {
     if (device->isNull())
-      devices->addItem("none", "");
+      _deviceList->addItem("none", "");
     else
-      devices->addItem(device->deviceName(), device->deviceName());
+      _deviceList->addItem(device->deviceName(), device->deviceName());
     if (*device == defaultDevice) {
-      devices->setCurrentIndex(i);
+      _deviceList->setCurrentIndex(i);
     }
   }
-
-  _monitor = new MonitorView(defaultDevice, _application);
-
-  QVBoxLayout *layout = new QVBoxLayout();
-  layout->addWidget(devices);
-  layout->addWidget(_monitor);
-
-  setLayout(layout);
-
-  connect(devices, SIGNAL(currentIndexChanged(int)), this, SLOT(deviceSelected(int)));
+  connect(_deviceList, SIGNAL(currentIndexChanged(int)), this, SLOT(_deviceSelected(int)));
 }
 
 void
-Monitor::deviceSelected(int idx) {
+Monitor::_deviceSelected(int idx) {
   _monitor->setDevice(_devices.at(idx));
   _application.station().setInputDevice(_devices.at(idx));
 }
