@@ -49,8 +49,8 @@ StationItem::StationItem(const NodeItem &node, const QJsonObject &obj)
   _location = Location(obj.value("location").toObject());
   _description = obj.value("description").toString();
 
-  logDebug() << "Got info for station " << _node.id() << " (" << _node.addr() << ":" << _node.port()
-             << ") @" << _location.longitude() << ", " << _location.latitude();
+  /*logDebug() << "Got info for station " << _node.id() << " (" << _node.addr() << ":" << _node.port()
+             << ") @" << _location.longitude() << ", " << _location.latitude(); */
 }
 
 StationItem::StationItem(const StationItem &other)
@@ -117,8 +117,8 @@ StationItem::update(const PeerItem &peer) {
 StationList::StationList(Station &station)
   : QAbstractTableModel(&station), _station(station)
 {
-  // every 2min update the network of known stations
-  _networkUpdateTimer.setInterval(1000*120);
+  // every 10min update the network of known stations
+  _networkUpdateTimer.setInterval(1000*600);
   _networkUpdateTimer.setSingleShot(false);
 
   connect(&_networkUpdateTimer, SIGNAL(timeout()), this, SLOT(_onUpdateNetwork()));
@@ -209,13 +209,13 @@ StationList::updateStation(const StationItem &station) {
     _stations.append(station);
     endInsertRows();
   }
-  logDebug() << "Station " << station.id() << ": Status updated.";
+  // logDebug() << "Station " << station.id() << ": Status updated.";
   emit stationUpdated(station);
 }
 
 void
 StationList::addToCandidates(const QList<Identifier> &nodes) {
-  logDebug() << "Received list of " << nodes.size() << " station identifiers.";
+  // logDebug() << "Received list of " << nodes.size() << " station identifiers.";
   QList<Identifier>::const_iterator node = nodes.begin();
   for (; node != nodes.end(); node++) {
     // only add new stations
@@ -241,7 +241,7 @@ StationList::_onUpdateNetwork() {
     // Update station
     contactStation(_stations[idx].id());
     // and get station list
-    logDebug() << "Update network: Query start list from " << _stations[idx].id();
+    // logDebug() << "Update network: Query start list from " << _stations[idx].id();
     StationListQuery *query = new StationListQuery(_station, _stations[idx].id());
     connect(query, SIGNAL(stationListReceived(QList<Identifier>)),
             this, SLOT(addToCandidates(QList<Identifier>)));
@@ -256,7 +256,7 @@ StationList::rowCount(const QModelIndex &parent) const {
 
 int
 StationList::columnCount(const QModelIndex &parent) const {
-  return 6;
+  return 7;
 }
 
 QVariant
@@ -268,16 +268,19 @@ StationList::data(const QModelIndex &index, int role) const {
     case 0:
       return _stations[index.row()].id().toBase32();
     case 1:
-      return _stations[index.row()].location().longitude();
+      return _stations[index.row()].peer().addr().toString()
+          + ":" + QString::number(_stations[index.row()].peer().port());
     case 2:
-      return _stations[index.row()].location().latitude();
+      return _stations[index.row()].location().longitude();
     case 3:
-      return _stations[index.row()].location().height();
+      return _stations[index.row()].location().latitude();
     case 4:
+      return _stations[index.row()].location().height();
+    case 5:
       return tr("%1 (%2) km")
           .arg(QString::number(_stations[index.row()].location().arcDist(_station.location()), 'f', 1))
           .arg(QString::number(_stations[index.row()].location().lineDist(_station.location()), 'f', 1));
-    case 5:
+    case 6:
       return _stations[index.row()].description();
   }
 
@@ -290,11 +293,12 @@ StationList::headerData(int section, Qt::Orientation orientation, int role) cons
   if (Qt::DisplayRole != role) { return QVariant(); }
   switch (section) {
     case 0: return tr("Identifier");
-    case 1: return tr("Longitude");
-    case 2: return tr("Latitude");
-    case 3: return tr("Height");
-    case 4: return tr("Distance");
-    case 5: return tr("Destription");
+    case 1: return tr("Address/Port");
+    case 2: return tr("Longitude");
+    case 3: return tr("Latitude");
+    case 4: return tr("Height");
+    case 5: return tr("Distance");
+    case 6: return tr("Destription");
   }
   return QVariant();
 }

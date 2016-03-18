@@ -4,6 +4,7 @@
 #include <QAbstractListModel>
 #include <QDateTime>
 #include <QVector>
+#include <QTimer>
 
 #include <ovlnet/buckets.hh>
 
@@ -45,6 +46,12 @@ public:
   Type type() const;
   /** Returns the local date and time of the first occurence of the event. */
   const QDateTime &first() const;
+  /** Returns the cost associated with the event.
+   * Costs are used for the heuristic to determine which remote events are selected to be included
+   * in the schedule. The costs of an event is determined by its type.
+   * That is, a single event has a cost of 1, weekly events have a cost of 4 and daily event costs
+   * 28. */
+  double cost() const;
 
   /** Serializes the event into a JSON object. */
   QJsonObject toJson() const;
@@ -67,38 +74,22 @@ class Schedule: public QAbstractListModel
 public:
   explicit Schedule(QObject *parent = 0);
 
-  size_t numEvents() const;
-  bool contains(const ScheduledEvent &event) const;
+  virtual size_t numEvents() const = 0;
+  virtual const ScheduledEvent &scheduledEvent(size_t idx) const = 0;
 
-  size_t add(const ScheduledEvent &event);
-  size_t addSingle(const QDateTime &when);
-  size_t addDaily(const QDateTime &first);
-  size_t addWeekly(const QDateTime &first);
+  virtual bool contains(const ScheduledEvent &event) const;
+  virtual QDateTime next(const QDateTime &now) const;
 
-  const ScheduledEvent &scheduledEvent(size_t idx) const;
-  void removeScheduledEvent(size_t idx);
-
-  QDateTime next(const QDateTime &now) const;
-
-  virtual bool save();
+  virtual QJsonArray toJson() const;
 
   /* *** Implementation of QAbstractListModel interface. */
   int rowCount(const QModelIndex &parent) const;
   QVariant data(const QModelIndex &index, int role) const;
   QVariant headerData(int section, Qt::Orientation orientation, int role) const;
 
-public slots:
-  void checkSchedule();
-
 signals:
-  void startRecording();
-
-protected slots:
-  void _updateSchedule();
-
-protected:
-  QDateTime _nextEvent;
-  QVector<ScheduledEvent> _events;
+  /** Gets emitted on schedule update (e.g. addition, removal or changing an event). */
+  void updated();
 };
 
 
@@ -109,10 +100,32 @@ class LocalSchedule: public Schedule
 public:
   explicit LocalSchedule(const QString &path, QObject *parent=0);
 
-  virtual bool save();
+  virtual size_t numEvents() const;
+  virtual const ScheduledEvent &scheduledEvent(size_t idx) const;
+
+  size_t add(const ScheduledEvent &event);
+  size_t addSingle(const QDateTime &when);
+  size_t addDaily(const QDateTime &first);
+  size_t addWeekly(const QDateTime &first);
+
+  void removeScheduledEvent(size_t idx);
+
+  bool save();
+
+public slots:
+  void checkSchedule();
+
+signals:
+  void startRecording(double mSec);
+
+protected slots:
+  void _updateSchedule();
 
 protected:
   QString _filename;
+  QDateTime _nextEvent;
+  QVector<ScheduledEvent> _events;
+  QTimer _timer;
 };
 
 
@@ -138,7 +151,7 @@ protected:
 };
 
 
-class RemoteSchedule: public QAbstractListModel
+class RemoteSchedule: public Schedule
 {
   Q_OBJECT
 
@@ -146,12 +159,10 @@ public:
   explicit RemoteSchedule(Station &station, QObject *parent=0);
 
   size_t numEvents() const;
-  const RemoteScheduledEvent &scheduledEvent(size_t i) const;
-  void add(const Identifier &node, const ScheduledEvent &obj);
+  const ScheduledEvent &scheduledEvent(size_t i) const;
 
-  /* *** Implementation of QAbstractListModel interface. */
-  int rowCount(const QModelIndex &parent) const;
-  QVariant data(const QModelIndex &index, int role) const;
+  void add(const Identifier &node, const ScheduledEvent &obj);
+  size_t numNodes(size_t i) const;
 
 protected slots:
   void _onUpdateStationSchedule(const StationItem &station);
@@ -160,6 +171,39 @@ protected slots:
 protected:
   Station &_station;
   QVector<RemoteScheduledEvent> _events;
+};
+
+
+class MergedSchedule: public Schedule
+{
+  Q_OBJECT
+
+public:
+  explicit MergedSchedule(const QString &path, Station &station, double maxCosts=28, QObject *parent=0);
+
+  size_t numEvents() const;
+  const ScheduledEvent &scheduledEvent(size_t idx) const;
+
+  LocalSchedule &local();
+  RemoteSchedule &remote();
+
+public slots:
+  void checkSchedule();
+
+signals:
+  void startRecording(double mSec);
+
+protected slots:
+  void _updateSchedule();
+  void _onScheduleUpdate();
+
+protected:
+  double _maxCosts;
+  LocalSchedule _local;
+  RemoteSchedule _remote;
+  QVector<ScheduledEvent> _mergedRemoteEvents;
+  QDateTime _nextEvent;
+  QTimer _timer;
 };
 
 #endif // SCHEDULE_HH

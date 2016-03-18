@@ -22,11 +22,11 @@ Station::Station(const QString &path, const QHostAddress &addr, uint16_t port, Q
     _schedule(0), _datasets(0), _receiver(0), _bootstrapTimer(), _ctrlWhitelist()
 {
   _stations = new StationList(*this);
-  _schedule = new LocalSchedule(_path+"/schedule.json", this);
+  _schedule = new MergedSchedule(_path+"/schedule.json", *this, 28, this);
   _datasets = new DataSetDir(_path+"/data");
 
   // Create receiver...
-  _receiver = new Receiver(_location, *_datasets, ReceiverConfig(_path+"/receiver.json"), this);
+  _receiver = new Receiver(*this, ReceiverConfig(_path+"/receiver.json"), this);
 
   // Register service
   registerService("vlf::station", new HttpService(*this, this, this));
@@ -45,6 +45,8 @@ Station::Station(const QString &path, const QHostAddress &addr, uint16_t port, Q
   // Whenever a new node appears in the OVL network, check if this one is a Station (i.e. a
   // member of the VLF network).
   connect(this, SIGNAL(nodeAppeard(NodeItem)), _stations, SLOT(contactStation(NodeItem)));
+  // Start scheduled recording
+  connect(_schedule, SIGNAL(startRecording(double)), _receiver, SLOT(start(double)));
 }
 
 const Location &
@@ -70,7 +72,7 @@ Station::stations() {
   return *_stations;
 }
 
-Schedule &
+MergedSchedule &
 Station::schedule() {
   return *_schedule;
 }

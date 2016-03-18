@@ -70,11 +70,11 @@ JsonQuery::_onConnectionEstablished() {
 void
 JsonQuery::_onResponseReceived() {
   if (HTTP_OK != _response->responseCode()) {
-    logDebug() << "Cannot query '" << _query << "': Station returned " << _response->responseCode();
+    logError() << "Cannot query '" << _query << "': Station returned " << _response->responseCode();
     _onError(); return;
   }
   if (! _response->hasResponseHeader("Content-Length")) {
-    logDebug() << "Station response has no length!";
+    logError() << "Station response has no length!";
     _onError(); return;
   }
 
@@ -84,7 +84,7 @@ JsonQuery::_onResponseReceived() {
 
 void
 JsonQuery::_onError() {
-  logDebug() << "Failed to access " << _query << ".";
+  logError() << "Failed to access " << _query << ".";
   emit failed();
   deleteLater();
 }
@@ -101,7 +101,7 @@ JsonQuery::_onReadyRead() {
     QJsonParseError error;
     QJsonDocument doc = QJsonDocument::fromJson(_buffer, &error);
     if (QJsonParseError::NoError != error.error) {
-      logDebug() << "Station returned invalid JSON document as result.";
+      logInfo() << "Station returned invalid JSON document as result.";
       _onError(); return;
     }
     this->finished(doc);
@@ -132,13 +132,13 @@ StationInfoQuery::StationInfoQuery(Node &node, const NodeItem &remote)
 void
 StationInfoQuery::finished(const QJsonDocument &doc) {
   if (! doc.isObject()) {
-    logDebug() << "Station returned invalid JSON description: Not an object.";
+    logError() << "Station returned invalid JSON description: Not an object.";
     _onError(); return;
   }
 
   StationItem item(NodeItem(_connection->peerId(), _connection->peer()), doc.object());
   if (item.isNull()) {
-    qDebug() << "Station returned invalid status: " << doc.toJson();
+    logError() << "Station returned invalid status.";
     _onError(); return;
   }
 
@@ -165,7 +165,7 @@ StationListQuery::StationListQuery(Node &node, const NodeItem &remote)
 void
 StationListQuery::finished(const QJsonDocument &doc) {
   if (! doc.isArray()) {
-    logDebug() << "Station returned invalid JSON description: Not an array.";
+    logError() << "Station returned invalid JSON description: Not an array.";
     _onError(); return;
   }
 
@@ -198,7 +198,7 @@ StationScheduleQuery::StationScheduleQuery(Node &node, const NodeItem &remote)
 void
 StationScheduleQuery::finished(const QJsonDocument &doc) {
   if (! doc.isArray()) {
-    logDebug() << "Station returned invalid JSON description: Not an array.";
+    logError() << "Station returned invalid JSON description: Not an array.";
     _onError(); return;
   }
 
@@ -232,10 +232,9 @@ DataSetListQuery::DataSetListQuery(Node &node, const NodeItem &remote)
 void
 DataSetListQuery::finished(const QJsonDocument &doc) {
   if (! doc.isObject()) {
-    logDebug() << "Station returned invalid dataset list: Not an object.";
+    logError() << "Station returned invalid dataset list: Not an object.";
     _onError(); return;
   }
-  logDebug() << "Dataset list received.";
   emit dataSetListReceived(_connection->peerId(), doc.object());
   JsonQuery::finished(doc);
 }
@@ -286,13 +285,13 @@ DownloadDataSetQuery::_onConnectionEstablished() {
 void
 DownloadDataSetQuery::_onResponseReceived() {
   if (HTTP_OK != _response->responseCode()) {
-    logDebug() << "Cannot query dataset '" << _dataSetID
+    logError() << "Cannot query dataset '" << _dataSetID
                << "': Station returned " << _response->responseCode();
     _onError();
     return;
   }
   if (! _response->hasResponseHeader("Content-Length")) {
-    logDebug() << "Station response has no length!";
+    logError() << "Station response has no length!";
     _onError(); return;
   }
 
@@ -304,7 +303,7 @@ DownloadDataSetQuery::_onResponseReceived() {
 
 void
 DownloadDataSetQuery::_onError() {
-  logDebug() << "Failed to access dataset '" << _dataSetID << "'.";
+  logError() << "Failed to access dataset '" << _dataSetID << "'.";
   emit failed();
   deleteLater();
 }

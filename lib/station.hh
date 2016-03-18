@@ -8,7 +8,7 @@
 #include <QAudioDeviceInfo>
 
 class StationList;
-class Schedule;
+class MergedSchedule;
 class Receiver;
 
 
@@ -29,7 +29,7 @@ public:
   StationList &stations();
 
   /** Returns the schedule of the station. */
-  Schedule &schedule();
+  MergedSchedule &schedule();
 
   /** Returns the datasets held by this station. */
   DataSetDir &datasets();
@@ -57,7 +57,7 @@ protected:
   /** A list of known stations. */
   StationList *_stations;
   /** The reception schedule of the station. */
-  Schedule *_schedule;
+  MergedSchedule *_schedule;
   /** The DB of all datasets. */
   DataSetDir *_datasets;
   /** The receiver. */

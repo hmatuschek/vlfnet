@@ -5,7 +5,7 @@
 #include <QJsonParseError>
 #include "datasetfile.hh"
 #include <netinet/in.h>
-
+#include "station.hh"
 
 
 /* ********************************************************************************************* *
@@ -120,8 +120,8 @@ ReceiverConfig::setDevice(const QAudioDeviceInfo &device) {
 /* ********************************************************************************************* *
  * Implementation of Receiver
  * ********************************************************************************************* */
-Receiver::Receiver(const Location &location, DataSetDir &dataDir, const ReceiverConfig &config, QObject *parent)
-  : Audio(config.device(), parent), _tmpFile(), _samples(0), _dataDir(dataDir)
+Receiver::Receiver(Station &station, const ReceiverConfig &config, QObject *parent)
+  : Audio(config.device(), parent), _station(station), _tmpFile(), _samples(0)
 {
   // pass...
 }
@@ -172,9 +172,9 @@ Receiver::save() {
   fileHeader.parents = 0;
 
   DataSetHeader header;
-  header.longitude = _location.longitude();
-  header.latitude = _location.latitude();
-  header.height = _location.height();
+  header.longitude = _station.location().longitude();
+  header.latitude = _station.location().latitude();
+  header.height = _station.location().height();
 
   // Create a new temp file to assemble datafile in
   QTemporaryFile tmpFile;
@@ -202,8 +202,9 @@ Receiver::save() {
   OVLHashFinal(&mdctx, (uint8_t *)hash);
 
   // Move to destination
-  tmpFile.copy(_dataDir.path()+Identifier(hash).toBase32());
-  logDebug() << "Added dataset at " << _dataDir.path()+Identifier(hash).toBase32();
+  tmpFile.copy(_station.datasets().path()+Identifier(hash).toBase32());
+  logDebug() << "Added dataset at " << _station.datasets().path()
+             << "/" << Identifier(hash).toBase32();
   return true;
 }
 
@@ -225,3 +226,115 @@ Receiver::writeData(const char *data, qint64 len) {
 
 
 
+/* ********************************************************************************************* *
+ * Implementation of Beacon
+ * ********************************************************************************************* */
+Beacon::Beacon()
+  : _name(), _fmin(0), _fmax(0)
+{
+  // pass...
+}
+
+Beacon::Beacon(const QString &name, double fmin, double fmax)
+  : _name(name), _fmin(fmin), _fmax(fmax)
+{
+  // pass...
+}
+
+Beacon::Beacon(const Beacon &other)
+  : _name(other._name), _fmin(other._fmin), _fmax(other._fmax)
+{
+  // pass...
+}
+
+const QString &
+Beacon::name() const {
+  return _name;
+}
+
+double
+Beacon::fmin() const {
+  return _fmin;
+}
+
+double
+Beacon::fmax() const {
+  return _fmax;
+}
+
+
+/* ********************************************************************************************* *
+ * Implementation of BeaconReceiver
+ * ********************************************************************************************* */
+BeaconReceiver::BeaconReceiver(const QVector<Beacon> &beacons, double tau,
+                               const ReceiverConfig &config, Station &station)
+  : Audio(config.device(), &station), _station(station), _nFFTBuffer(4096), _beacons(beacons)
+{
+  _fftInBuffer = new double[4096];
+  _fftOutBuffer = new double[4096];
+  _fft = fftw_plan_r2r_1d(4096, _fftInBuffer, _fftOutBuffer, FFTW_R2HC, FFTW_ESTIMATE);
+  // resize and initialize signal averages
+  _averages.fill(0, _beacons.size());
+  // damping factor for the averaging
+  _lambda = std::min(1., 4096./48e3/tau);
+}
+
+BeaconReceiver::~BeaconReceiver() {
+  fftw_destroy_plan(_fft);
+  delete[] _fftInBuffer;
+  delete[] _fftOutBuffer;
+}
+
+const QVector<Beacon> &
+BeaconReceiver::beacons() const {
+  return _beacons;
+}
+
+const QVector<double> &
+BeaconReceiver::averages() const {
+  return _averages;
+}
+
+qint64
+BeaconReceiver::writeData(const char *data, qint64 len) {
+  if (len <= 0) { return 0; }
+  // Store samples in FFT input buffer
+  size_t nSamples = std::min(size_t(len/2), _nFFTBuffer);
+  for (size_t i=0; i<nSamples; i++) {
+    _fftInBuffer[4096-_nFFTBuffer] = ntohs(* (int16_t *)(data+i));
+  }
+  // update samples left
+  _nFFTBuffer -= nSamples;
+  // If inbuffer is full -> do FFT
+  if (0 == _nFFTBuffer) {
+    _doFFT();
+    _nFFTBuffer = 4096;
+  }
+
+  // Return the number of bytes processed
+  return nSamples*2;
+}
+
+void
+BeaconReceiver::_doFFT() {
+  // Perform FFT
+  fftw_execute(_fft);
+  // Update signal estimates
+  for (size_t i=0; i<_beacons.size(); i++) {
+    int a = 4096*_beacons[i].fmin()/48e3;
+    int b = 4096*_beacons[i].fmax()/48e3;
+    // limit a & b
+    a = std::max(1, std::min(a, 2048));
+    b = std::max(1, std::min(b, 2048));
+    // get max signal
+    double sig = 0;
+    for (int j=a; j<b; j++) {
+      double v = _fftOutBuffer[j]*_fftOutBuffer[j] +
+          _fftOutBuffer[4096-j]*_fftOutBuffer[4096-j];
+      v = std::sqrt(v/4096);
+      sig = std::max(sig, v);
+    }
+    // peform averaging
+    _averages[i] = (1-_lambda)*_averages[i] + _lambda*sig;
+  }
+}

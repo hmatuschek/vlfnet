@@ -15,13 +15,30 @@
 
 
 /* ********************************************************************************************* *
+ * Implementation of MergedScheduleView
+ * ********************************************************************************************* */
+MergedScheduleView::MergedScheduleView(Application &app, QWidget *parent)
+  : QWidget(parent), _application(app)
+{
+  _events = new QListView();
+  _events->setModel(&_application.station().schedule());
+  _events->setSelectionMode(QAbstractItemView::NoSelection);
+
+  QVBoxLayout *layout = new QVBoxLayout();
+  layout->addWidget(_events);
+
+  setLayout(layout);
+}
+
+
+/* ********************************************************************************************* *
  * Implementation of LocalScheduleView
  * ********************************************************************************************* */
 LocalScheduleView::LocalScheduleView(Application &app, QWidget *parent)
   : QWidget(parent), _application(app)
 {
   _localEvents = new QListView();
-  _localEvents->setModel(&app.station().schedule());
+  _localEvents->setModel(&app.station().schedule().local());
   _localEvents->setSelectionMode(QAbstractItemView::SingleSelection);
 
   QPushButton *add = new QPushButton(tr("+"));
@@ -53,17 +70,17 @@ LocalScheduleView::_onAdd() {
 
   switch (dialog.type()) {
     case ScheduledEvent::SINGLE:
-      _application.station().schedule().addSingle(dialog.firstEvent());
+      _application.station().schedule().local().addSingle(dialog.firstEvent());
       break;
     case ScheduledEvent::DAILY:
-      _application.station().schedule().addDaily(dialog.firstEvent());
+      _application.station().schedule().local().addDaily(dialog.firstEvent());
       break;
     case ScheduledEvent::WEEKLY:
-      _application.station().schedule().addWeekly(dialog.firstEvent());
+      _application.station().schedule().local().addWeekly(dialog.firstEvent());
       break;
   }
 
-  _application.station().schedule().save();
+  _application.station().schedule().local().save();
 }
 
 void
@@ -79,8 +96,8 @@ LocalScheduleView::_onRem() {
     return;
   }
 
-  _application.station().schedule().removeScheduledEvent(idx.row());
-  _application.station().schedule().save();
+  _application.station().schedule().local().removeScheduledEvent(idx.row());
+  _application.station().schedule().local().save();
 }
 
 
@@ -88,12 +105,10 @@ LocalScheduleView::_onRem() {
  * Implementation of RemoteScheduleView
  * ********************************************************************************************* */
 RemoteScheduleView::RemoteScheduleView(Application &app, QWidget *parent)
-  : QWidget(parent), _application(app), _remoteSchedule(0)
+  : QWidget(parent), _application(app)
 {
-  _remoteSchedule = new RemoteSchedule(app.station(), this);
-
   _remoteEvents = new QListView();
-  _remoteEvents->setModel(_remoteSchedule);
+  _remoteEvents->setModel(&_application.station().schedule().remote());
   _remoteEvents->setSelectionMode(QAbstractItemView::SingleSelection);
 
   QPushButton *add = new QPushButton(tr("+"));
@@ -124,8 +139,9 @@ RemoteScheduleView::_onAdd() {
     return;
   }
 
-  _application.station().schedule().add(_remoteSchedule->scheduledEvent(idx.row()));
-  _application.station().schedule().save();
+  _application.station().schedule().local().add(
+        _application.station().schedule().remote().scheduledEvent(idx.row()));
+  _application.station().schedule().local().save();
 }
 
 
@@ -135,6 +151,7 @@ RemoteScheduleView::_onAdd() {
 ScheduleView::ScheduleView(Application &app, QWidget *parent)
   : QTabWidget(parent)
 {
+  addTab(new MergedScheduleView(app), tr("Merged Schedule"));
   addTab(new LocalScheduleView(app), tr("Local Schedule"));
   addTab(new RemoteScheduleView(app), tr("Remote Schedules"));
 }

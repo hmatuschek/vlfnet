@@ -111,7 +111,6 @@ MonitorView::MonitorView(const QAudioDeviceInfo &device, Application &app, QWidg
           this, SLOT(processStream(const int16_t*,size_t)));
 
   _input->start();
-
 }
 
 MonitorView::~MonitorView() {
@@ -177,7 +176,7 @@ MonitorView::updatePlot() {
   painter.drawPixmap(0, 0, _plot, 0, 1, N_PLOT, N_PLOT_HIST);
   for (int i=1; i<N_PLOT; i++) {
     double db = 10*std::log10(_psd[PLOT_OFFSET+i-1])
-        - 10*std::log10(N_FFT) - 10*std::log10(N_PSD_SUM);
+        /*- 10*std::log10(N_FFT) - 10*std::log10(N_PSD_SUM)*/;
     db = std::max(DB_MIN, std::min(db, DB_MAX));
     painter.setPen(_colormap(db));
     painter.drawLine(i-1, N_PLOT_HIST-1, i, N_PLOT_HIST-1);

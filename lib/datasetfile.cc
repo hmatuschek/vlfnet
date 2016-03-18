@@ -542,7 +542,7 @@ RemoteDataSetList::headerData(int section, Qt::Orientation orientation, int role
 
 void
 RemoteDataSetList::_onUpdateRemoteDataSets(const StationItem &station) {
-  logDebug() << "Station " << station.id() << " updated -> Get dataset list.";
+  // logDebug() << "Station " << station.id() << " updated -> Get dataset list.";
   DataSetListQuery *query = new DataSetListQuery(_station, station.node());
   connect(query, SIGNAL(dataSetListReceived(Identifier,QJsonObject)),
           this, SLOT(add(Identifier,QJsonObject)));

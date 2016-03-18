@@ -28,7 +28,6 @@ dayOfWeekName(int dow) {
 }
 
 
-
 /* ********************************************************************************************* *
  * Implementation of ScheduledEvent interface
  * ********************************************************************************************* */
@@ -124,14 +123,24 @@ ScheduledEvent::first() const {
   return _first;
 }
 
+double
+ScheduledEvent::cost() const {
+  switch (_type) {
+    case DAILY: return 28.;
+    case WEEKLY: return 4;
+    case SINGLE: return 1;
+  }
+  return 0.;
+}
+
 QJsonObject
 ScheduledEvent::toJson() const {
   QJsonObject obj;
   obj.insert("first", _first.toUTC().toString("yyyy-MM-dd hh:mm:ss"));
   switch (_type) {
-    case SINGLE: obj.insert("repeat", "never"); break;
-    case DAILY: obj.insert("repeat", "daily"); break;
-    case WEEKLY: obj.insert("repeat", "weekly"); break;
+    case SINGLE: obj.insert("repeat", QString("never")); break;
+    case DAILY: obj.insert("repeat", QString("daily")); break;
+    case WEEKLY: obj.insert("repeat", QString("weekly")); break;
   }
   return obj;
 }
@@ -152,7 +161,7 @@ ScheduledEvent::operator !=(const ScheduledEvent &other) const {
  * Implementation of Schedule interface
  * ********************************************************************************************* */
 Schedule::Schedule(QObject *parent)
-  : QAbstractListModel(parent), _nextEvent()
+  : QAbstractListModel(parent)
 {
   // pass...
 }
@@ -160,8 +169,8 @@ Schedule::Schedule(QObject *parent)
 QDateTime
 Schedule::next(const QDateTime &now) const {
   QDateTime next;
-  for (int i=0; i<_events.size(); i++) {
-    QDateTime evt = _events[i].nextEvent(now);
+  for (int i=0; i<this->numEvents(); i++) {
+    QDateTime evt = this->scheduledEvent(i).nextEvent(now);
     if (evt.isValid() && (!next.isValid() || (evt<next))) {
       next = evt;
     }
@@ -169,89 +178,34 @@ Schedule::next(const QDateTime &now) const {
   return next;
 }
 
-size_t
-Schedule::numEvents() const {
-  return _events.size();
-}
-
 bool
 Schedule::contains(const ScheduledEvent &event) const {
-  for (int i=0; i<_events.size(); i++) {
-    if (_events[i] == event) { return true; }
+  for (int i=0; i<this->numEvents(); i++) {
+    if (this->scheduledEvent(i) == event)
+      return true;
   }
   return false;
 }
 
-size_t
-Schedule::add(const ScheduledEvent &event) {
-  for (int i=0; i<_events.size(); i++) {
-    if (_events[i] == event) { return i; }
+QJsonArray
+Schedule::toJson() const {
+  QJsonArray res;
+  for (size_t i=0; i<this->numEvents(); i++) {
+    if (this->scheduledEvent(i).isValid())
+      res.append(this->scheduledEvent(i).toJson());
   }
-  size_t idx = _events.size();
-  beginInsertRows(QModelIndex(), idx, idx);
-  _events.push_back(event);
-  _updateSchedule();
-  endInsertRows();
-  return idx;
-}
-
-size_t
-Schedule::addSingle(const QDateTime &when) {
-  return add(ScheduledEvent(when, ScheduledEvent::SINGLE));
-}
-
-size_t
-Schedule::addDaily(const QDateTime &first) {
-  return add(ScheduledEvent(first, ScheduledEvent::DAILY));
-}
-
-size_t
-Schedule::addWeekly(const QDateTime &first) {
-  return add(ScheduledEvent(first, ScheduledEvent::WEEKLY));
-}
-
-const ScheduledEvent &
-Schedule::scheduledEvent(size_t idx) const {
-  return _events[idx];
-}
-
-void
-Schedule::removeScheduledEvent(size_t idx) {
-  if (int(idx) < _events.size()) {
-    beginRemoveRows(QModelIndex(), idx, idx);
-    _events.remove(idx, 1);
-    _updateSchedule();
-    endRemoveRows();
-  }
-}
-
-void
-Schedule::_updateSchedule() {
-  _nextEvent = this->next(QDateTime::currentDateTime());
-}
-
-void
-Schedule::checkSchedule() {
-  if (_nextEvent.isValid() && (_nextEvent == QDateTime::currentDateTime())) {
-    emit startRecording();
-    _updateSchedule();
-  }
-}
-
-bool
-Schedule::save() {
-  return true;
+  return res;
 }
 
 int
 Schedule::rowCount(const QModelIndex &parent) const {
-  return _events.size();
+  return this->numEvents();
 }
 
 QVariant
 Schedule::data(const QModelIndex &index, int role) const {
-  if (index.row() >= _events.size()) { return QVariant(); }
-  const ScheduledEvent &evt = _events[index.row()];
+  if (index.row() >= this->numEvents()) { return QVariant(); }
+  const ScheduledEvent &evt = this->scheduledEvent(index.row());
 
   if (Qt::DisplayRole == role) {
     if (ScheduledEvent::SINGLE == evt.type()) {
@@ -288,7 +242,7 @@ Schedule::headerData(int section, Qt::Orientation orientation, int role) const {
  * Implementation of LocalSchedule
  * ********************************************************************************************* */
 LocalSchedule::LocalSchedule(const QString &path, QObject *parent)
-  : Schedule(parent), _filename(path)
+  : Schedule(parent), _filename(path), _nextEvent(), _timer()
 {
   logDebug() << "Load local schedule from file " << _filename << ".";
   QFile file(_filename);
@@ -330,6 +284,12 @@ LocalSchedule::LocalSchedule(const QString &path, QObject *parent)
     _events.push_back(evt);
     _updateSchedule();
     endInsertRows();
+
+    _timer.setInterval(750);
+    _timer.setSingleShot(false);
+
+    connect(&_timer, SIGNAL(timeout()), this, SLOT(checkSchedule()));
+    _timer.start();
   }
 }
 
@@ -356,6 +316,70 @@ LocalSchedule::save() {
   file.close();
 
   return true;
+}
+
+size_t
+LocalSchedule::numEvents() const {
+  return _events.size();
+}
+
+size_t
+LocalSchedule::add(const ScheduledEvent &event) {
+  for (int i=0; i<_events.size(); i++) {
+    if (_events[i] == event) { return i; }
+  }
+  size_t idx = _events.size();
+  beginInsertRows(QModelIndex(), idx, idx);
+  _events.push_back(event);
+  _updateSchedule();
+  endInsertRows();
+  emit updated();
+  return idx;
+}
+
+size_t
+LocalSchedule::addSingle(const QDateTime &when) {
+  return add(ScheduledEvent(when, ScheduledEvent::SINGLE));
+}
+
+size_t
+LocalSchedule::addDaily(const QDateTime &first) {
+  return add(ScheduledEvent(first, ScheduledEvent::DAILY));
+}
+
+size_t
+LocalSchedule::addWeekly(const QDateTime &first) {
+  return add(ScheduledEvent(first, ScheduledEvent::WEEKLY));
+}
+
+const ScheduledEvent &
+LocalSchedule::scheduledEvent(size_t idx) const {
+  return _events[idx];
+}
+
+void
+LocalSchedule::removeScheduledEvent(size_t idx) {
+  if (int(idx) < _events.size()) {
+    beginRemoveRows(QModelIndex(), idx, idx);
+    _events.remove(idx, 1);
+    _updateSchedule();
+    endRemoveRows();
+    emit updated();
+  }
+}
+
+void
+LocalSchedule::_updateSchedule() {
+  _nextEvent = this->next(QDateTime::currentDateTime());
+}
+
+void
+LocalSchedule::checkSchedule() {
+  if (_nextEvent.isValid() && (_nextEvent == QDateTime::currentDateTime())) {
+    _updateSchedule();
+    // Start a recording of 10 min
+    emit startRecording(1000*60*10);
+  }
 }
 
 
@@ -413,7 +437,7 @@ RemoteScheduledEvent::addNode(const Identifier &id) {
  * Implementation of RemoteSchedule
  * ********************************************************************************************* */
 RemoteSchedule::RemoteSchedule(Station &station, QObject *parent)
-  : QAbstractListModel(parent), _station(station)
+  : Schedule(parent), _station(station)
 {
   connect(&_station.stations(), SIGNAL(stationUpdated(StationItem)),
           this, SLOT(_onUpdateStationSchedule(StationItem)));
@@ -424,7 +448,7 @@ RemoteSchedule::numEvents() const {
   return _events.size();
 }
 
-const RemoteScheduledEvent &
+const ScheduledEvent &
 RemoteSchedule::scheduledEvent(size_t i) const {
   return _events[i];
 }
@@ -438,6 +462,7 @@ RemoteSchedule::add(const Identifier &node, const ScheduledEvent &obj) {
     if (_events[i] == evt) {
       emit dataChanged(index(i,0), index(i,0));
       _events[i].addNode(node);
+      emit updated();
       return;
     }
   }
@@ -445,43 +470,17 @@ RemoteSchedule::add(const Identifier &node, const ScheduledEvent &obj) {
   beginInsertRows(QModelIndex(), _events.size(), _events.size());
   _events.append(evt);
   endInsertRows();
+  emit updated();
 }
 
-int
-RemoteSchedule::rowCount(const QModelIndex &parent) const {
-  return _events.size();
-}
-
-QVariant
-RemoteSchedule::data(const QModelIndex &index, int role) const {
-  if (index.row() >= _events.size()) { return QVariant(); }
-  if (Qt::DisplayRole != role) { return QVariant(); }
-
-  RemoteScheduledEvent evt = _events[index.row()];
-  if (ScheduledEvent::SINGLE == evt.type()) {
-    return tr("Once on %1 at %2 (%3 nodes)")
-        .arg(evt.first().date().toString())
-        .arg(evt.first().time().toString())
-        .arg(evt.numNodes());
-  } else if (ScheduledEvent::DAILY == evt.type()) {
-    return tr("Daily at %1 starting on %2 (%3 nodes)")
-        .arg(evt.first().time().toString())
-        .arg(evt.first().date().toString())
-        .arg(evt.numNodes());
-  } else if (ScheduledEvent::WEEKLY == evt.type()) {
-    return tr("Every %1 at %2 starting on %3 (%4 nodes)")
-        .arg(dayOfWeekName(evt.first().date().dayOfWeek()))
-        .arg(evt.first().time().toString())
-        .arg(evt.first().date().toString())
-        .arg(evt.numNodes());
-  }
-
-  return QVariant("Invalid.");
+size_t
+RemoteSchedule::numNodes(size_t i) const {
+  return _events[i].numNodes();
 }
 
 void
 RemoteSchedule::_onUpdateStationSchedule(const StationItem &station) {
-  logDebug() << "Station " << station.id() << " updated -> Update schedule.";
+  // logDebug() << "Station " << station.id() << " updated -> Update schedule.";
   StationScheduleQuery *query = new StationScheduleQuery(_station, station.node());
   connect(query, SIGNAL(stationScheduleReceived(Identifier,QList<ScheduledEvent>)),
           this, SLOT(_onStationScheduleReceived(Identifier,QList<ScheduledEvent>)));
@@ -489,9 +488,106 @@ RemoteSchedule::_onUpdateStationSchedule(const StationItem &station) {
 
 void
 RemoteSchedule::_onStationScheduleReceived(const Identifier &remote, const QList<ScheduledEvent> &events) {
-  logDebug() << "Station schedule received...";
+  // logDebug() << "Station schedule received...";
   QList<ScheduledEvent>::const_iterator evt = events.begin();
   for (; evt != events.end(); evt++) {
     this->add(remote, *evt);
   }
+}
+
+
+/* ********************************************************************************************* *
+ * Implementation of MergedSchedule
+ * ********************************************************************************************* */
+bool eventWeightLessThan(const QPair<ScheduledEvent, size_t> &a, const QPair<ScheduledEvent, size_t> &b) {
+  // Returns the weight for the events that is (cost / # nodes )
+  return (a.first.cost()/a.second) < (b.first.cost()/b.second);
+}
+
+MergedSchedule::MergedSchedule(const QString &path, Station &station, double maxCosts, QObject *parent)
+  : Schedule(parent), _maxCosts(maxCosts), _local(path), _remote(station)
+{
+  // Connect to changes in the local and remote schedules
+  connect(&_local, SIGNAL(updated()), this, SLOT(_onScheduleUpdate()));
+  connect(&_remote, SIGNAL(updated()), this, SLOT(_onScheduleUpdate()));
+
+  // Configure check timer
+  _timer.setInterval(750);
+  _timer.setSingleShot(false);
+  // check for event regularily
+  connect(&_timer, SIGNAL(timeout()), this, SLOT(checkSchedule()));
+
+  _onScheduleUpdate();
+  _timer.start();
+}
+
+size_t
+MergedSchedule::numEvents() const {
+  return _local.numEvents()+_mergedRemoteEvents.size();
+}
+
+const ScheduledEvent &
+MergedSchedule::scheduledEvent(size_t idx) const {
+  if (idx < _local.numEvents()) {
+    return _local.scheduledEvent(idx);
+  }
+  return _mergedRemoteEvents[idx-_local.numEvents()];
+}
+
+LocalSchedule &
+MergedSchedule::local() {
+  return _local;
+}
+
+RemoteSchedule &
+MergedSchedule::remote() {
+  return _remote;
+}
+
+void
+MergedSchedule::checkSchedule() {
+  if (_nextEvent.isValid() && (_nextEvent == QDateTime::currentDateTime())) {
+    _updateSchedule();
+    // Start a recording of 10 min
+    emit startRecording(1000*60*10);
+  }
+}
+
+void
+MergedSchedule::_updateSchedule() {
+  _nextEvent = this->next(QDateTime::currentDateTime());
+}
+
+void
+MergedSchedule::_onScheduleUpdate() {
+  beginResetModel();
+  double cost = _maxCosts;
+  // Add consts from local events
+  for (size_t i=0; i<_local.numEvents(); i++) {
+    cost -= _local.scheduledEvent(i).cost();
+  }
+  _mergedRemoteEvents.clear();
+  // If some cost margin left for remote events add some cheap enough but worth it
+  if (cost > 0) {
+    // Filter remote events by cost
+    QVector< QPair<ScheduledEvent, size_t> > remEvt; remEvt.reserve(_remote.numEvents());
+    for (size_t i=0; i<_remote.numEvents(); i++) {
+      // Ignore all events to expesive or already on local schedule
+      if ( (_remote.scheduledEvent(i).cost() < cost) && ! _local.contains(_remote.scheduledEvent(i))) {
+        remEvt.append(QPair<ScheduledEvent, size_t>(_remote.scheduledEvent(i), _remote.numNodes(i)));
+      }
+    }
+    // sort remote events by weight
+    qStableSort(remEvt.begin(), remEvt.end(), &eventWeightLessThan);
+    // Add as many events as allowed by the cost margin left
+    for (int i=0; i<remEvt.size(); i++) {
+      if (cost > remEvt[i].first.cost()) {
+        _mergedRemoteEvents.append(remEvt[i].first);
+        cost -= remEvt[i].first.cost();
+      }
+    }
+  }
+  endResetModel();
+  // Update next event
+  _updateSchedule();
 }

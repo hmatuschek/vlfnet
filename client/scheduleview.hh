@@ -10,6 +10,19 @@ class QListView;
 class RemoteSchedule;
 
 
+class MergedScheduleView: public QWidget
+{
+  Q_OBJECT
+
+public:
+  explicit MergedScheduleView(Application &app, QWidget *parent=0);
+
+protected:
+  Application &_application;
+  QListView *_events;
+};
+
+
 class LocalScheduleView : public QWidget
 {
   Q_OBJECT
@@ -39,7 +52,6 @@ protected slots:
 
 protected:
   Application &_application;
-  RemoteSchedule *_remoteSchedule;
   QListView *_remoteEvents;
 };
 

@@ -17,6 +17,12 @@ IF (WITH_SYSTEMD)
  install(FILES "${CMAKE_BINARY_DIR}/vlfdaemon.service" DESTINATION "/etc/systemd/system")
 ENDIF (WITH_SYSTEMD)
 
+IF (WITH_SYSTEMD_USER)
+ message(STATUS "Install systemd service file (per user).")
+ configure_file("../shared/init/vlfdaemon.service.in" "${CMAKE_BINARY_DIR}/vlfdaemon.service")
+ install(FILES "${CMAKE_BINARY_DIR}/vlfdaemon.service" DESTINATION "~/.local/share/systemd/user/system")
+ENDIF (WITH_SYSTEMD_USER)
+
 if (WITH_LAUNCHD)
  message(STATUS "Install launchd service file.")
  configure_file("../shared/init/vlfdaemon.plist.in" "${CMAKE_BINARY_DIR}/io.github.hmatuschek.vlfdaemon.plist")

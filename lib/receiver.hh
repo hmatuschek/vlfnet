@@ -7,6 +7,7 @@
 #include "audio.hh"
 #include "location.hh"
 #include "datasetfile.hh"
+#include <fftw3.h>
 
 
 class ReceiverConfig
@@ -35,7 +36,7 @@ class Receiver: public Audio
   Q_OBJECT
 
 public:
-  Receiver(const Location &location, DataSetDir &dataDir, const ReceiverConfig &config, QObject *parent=0);
+  Receiver(Station &station, const ReceiverConfig &config, QObject *parent=0);
   virtual ~Receiver();
 
 public slots:
@@ -47,11 +48,58 @@ protected:
   bool save();
 
 protected:
+  Station &_station;
   QTemporaryFile _tmpFile;
   size_t _samples;
-  DataSetDir &_dataDir;
   QDateTime _startTime;
-  Location _location;
+};
+
+
+class Beacon
+{
+public:
+  Beacon();
+  Beacon(const QString &name, double fmin, double fmax);
+  Beacon(const Beacon &other);
+
+  Beacon &operator=(const Beacon &other);
+
+  const QString &name() const;
+  double fmin() const;
+  double fmax() const;
+
+protected:
+  QString _name;
+  double _fmin;
+  double _fmax;
+};
+
+
+class BeaconReceiver: public Audio
+{
+  Q_OBJECT
+
+public:
+  BeaconReceiver(const QVector<Beacon> &beacons, double tau, const ReceiverConfig &config, Station &station);
+  virtual ~BeaconReceiver();
+
+  const QVector<Beacon> &beacons() const;
+  const QVector<double> &averages() const;
+
+protected:
+  qint64 writeData(const char *data, qint64 len);
+  void _doFFT();
+
+protected:
+  Station &_station;
+
+  fftw_plan _fft;
+  size_t _nFFTBuffer;
+  double *_fftInBuffer;
+  double *_fftOutBuffer;
+  double _lambda;
+  QVector<Beacon> _beacons;
+  QVector<double> _averages;
 };
 
 #endif // RECEIVER_HH

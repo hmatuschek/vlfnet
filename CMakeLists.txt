@@ -6,6 +6,7 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${PROJECT_SOURCE_DIR}/cmake
 include(InstallHeadersWithDirectory)
 
 option(WITH_SYSTEMD "Install systemd service file." OFF)
+option(WITH_SYSTEMD_USER "Install systemd service file (per user)." OFF)
 option(WITH_UPSTART "Install upstart service file." OFF)
 option(WITH_LAUNCHD "Install LaunchD service file." OFF)
 
