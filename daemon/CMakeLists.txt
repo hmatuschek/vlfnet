@@ -29,6 +29,11 @@ if (WITH_LAUNCHD)
  install(FILES "${CMAKE_BINARY_DIR}/io.github.hmatuschek.vlfdaemon.plist" DESTINATION "/Library/LaunchDaemons")
 endif (WITH_LAUNCHD)
 
+IF (WITH_UPSTART)
+ message(STATUS "Install upstart service file.")
+ configure_file("../shared/init/vlfdaemon.conf.in" "${CMAKE_BINARY_DIR}/vlfdaemon.conf")
+ install(FILES "${CMAKE_BINARY_DIR}/vlfdaemon.conf" DESTINATION "/etc/init")
+ENDIF (WITH_UPSTART)
 # Install binary
 INSTALL(TARGETS vlfdaemon DESTINATION bin)
 

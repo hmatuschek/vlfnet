@@ -169,7 +169,7 @@ Schedule::Schedule(QObject *parent)
 QDateTime
 Schedule::next(const QDateTime &now) const {
   QDateTime next;
-  for (int i=0; i<this->numEvents(); i++) {
+  for (size_t i=0; i<this->numEvents(); i++) {
     QDateTime evt = this->scheduledEvent(i).nextEvent(now);
     if (evt.isValid() && (!next.isValid() || (evt<next))) {
       next = evt;
@@ -180,7 +180,7 @@ Schedule::next(const QDateTime &now) const {
 
 bool
 Schedule::contains(const ScheduledEvent &event) const {
-  for (int i=0; i<this->numEvents(); i++) {
+  for (size_t i=0; i<this->numEvents(); i++) {
     if (this->scheduledEvent(i) == event)
       return true;
   }
@@ -204,7 +204,7 @@ Schedule::rowCount(const QModelIndex &parent) const {
 
 QVariant
 Schedule::data(const QModelIndex &index, int role) const {
-  if (index.row() >= this->numEvents()) { return QVariant(); }
+  if (size_t(index.row()) >= this->numEvents()) { return QVariant(); }
   const ScheduledEvent &evt = this->scheduledEvent(index.row());
 
   if (Qt::DisplayRole == role) {
