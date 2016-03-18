@@ -1,0 +1,11 @@
+#
+# Upstart script for vlfdaemon
+#
+
+description "The VLF observatory network daemon"
+
+exec ${CMAKE_INSTALL_PREFIX}/bin/ovldaemon
+
+start on runlevel [23]
+stop on runlevel [016]
+
