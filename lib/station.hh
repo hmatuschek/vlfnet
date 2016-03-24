@@ -12,11 +12,15 @@ class MergedSchedule;
 class Receiver;
 
 
+/** Central class of all vlfnet stations. It keeps track of all known stations in the network and
+ * their schedules and data. */
 class Station : public Node, public HttpRequestHandler
 {
   Q_OBJECT
 
 public:
+  /** Constructs a new vlfnet station using the configuration at the directory specified by
+   * @c path. The underlying ovlnet node gets bound to the specified @c addr and @c port. */
   explicit Station(const QString &path, const QHostAddress &addr=QHostAddress::Any,
                    uint16_t port=7741, QObject *parent=0);
 
@@ -34,7 +38,9 @@ public:
   /** Returns the datasets held by this station. */
   DataSetDir &datasets();
 
+  /** Returns the configured default reception device. */
   QAudioDeviceInfo inputDevice() const;
+  /** Sets the default reception device. */
   bool setInputDevice(const QAudioDeviceInfo &device);
 
   /** Filters HTTP requests. */
@@ -51,6 +57,7 @@ protected slots:
   void _onConnected();
 
 protected:
+  /** Path to the configuration directory. */
   QString _path;
   /** My location. */
   Location _location;
@@ -67,31 +74,5 @@ protected:
   /** Whitelist for the remote ctrl. */
   QSet<Identifier> _ctrlWhitelist;
 };
-
-
-
-class CtrlResponse: public HttpResponse
-{
-  Q_OBJECT
-
-public:
-  explicit CtrlResponse(Station &station, HttpRequest *request);
-
-public slots:
-  void process(const QJsonDocument &doc);
-
-protected slots:
-  void _onHeadersSend();
-  void _onReadyRead();
-  void _onBytesWritten(qint64 n);
-
-protected:
-  Station &_station;
-  HttpMethod _method;
-  QString _path;
-  size_t _requestSize;
-  QByteArray _buffer;
-};
-
 
 #endif // STATION_HH

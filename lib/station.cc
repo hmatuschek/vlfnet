@@ -5,12 +5,14 @@
 #include <QAudioDeviceInfo>
 
 #include <ovlnet/node.hh>
+#include <ovlnet/socks.hh>
 
 #include "location.hh"
 #include "stationlist.hh"
 #include "schedule.hh"
 #include "receiver.hh"
 #include "bootstraplist.hh"
+#include "socksservice.hh"
 
 
 /* ********************************************************************************************* *
@@ -29,7 +31,8 @@ Station::Station(const QString &path, const QHostAddress &addr, uint16_t port, Q
   _receiver = new Receiver(*this, ReceiverConfig(_path+"/receiver.json"), this);
 
   // Register service
-  registerService("vlf::station", new HttpService(*this, this, this));
+  registerService("vlf::station", new HttpService(*this, this));
+  registerService("::socks", new SocksService(_path+"/sockswhitelist.json", *this));
 
   // Setup boostrap timer
   _bootstrapTimer.setInterval(60*1000);
@@ -158,10 +161,6 @@ Station::processRequest(HttpRequest *request) {
     // serve file
     return new HttpFileResponse(
           _datasets->dataset(Identifier::fromBase32(id)).filename(), request);
-  } else if (request->uri().path().startsWith("/ctrl/") &&
-             _ctrlWhitelist.contains(request->remote().id())) {
-    // Handle CTRL requests
-    return new CtrlResponse(*this, request);
   }
 
   // Unknown request -> send a 404
@@ -189,84 +188,4 @@ Station::_onConnected() {
 void
 Station::_onDisconnected() {
   _bootstrapTimer.start();
-}
-
-/* ********************************************************************************************* *
- * Implementation of CtrlResponse
- * ********************************************************************************************* */
-CtrlResponse::CtrlResponse(Station &station, HttpRequest *request)
-  : HttpResponse(request->version(), HTTP_RESP_INCOMPLETE, request->socket()),
-    _station(station), _path(request->uri().path().mid(6)), _requestSize(0), _buffer()
-{
-  connect(_socket, SIGNAL(readChannelFinished()), this, SIGNAL(completed()));
-  if (HTTP_POST != request->method()) { return; }
-  if (! request->hasHeader("Content-Length")) {
-    logInfo() << "HTTP_POST w/o Content-Length.";
-    this->setResponseCode(HTTP_BAD_REQUEST);
-    this->sendHeaders();
-    return;
-  }
-
-  bool ok; _requestSize = request->header("Content-Length").toUInt(&ok);
-  if (! ok) {
-    logInfo() << "Malformed Content-Length header: '" << request->header("Content-Length") << "'.";
-    this->setResponseCode(HTTP_BAD_REQUEST);
-    this->sendHeaders();
-    return;
-  }
-
-  connect(_socket, SIGNAL(readyRead()), this, SLOT(_onReadyRead()));
-  _onReadyRead();
-}
-
-void
-CtrlResponse::process(const QJsonDocument &doc) {
-  /// @todo Implement JSON RPC for remote ctrl.
-  setResponseCode(HTTP_NOT_FOUND);
-}
-
-void
-CtrlResponse::_onReadyRead() {
-  while (_socket->bytesAvailable() && _requestSize) {
-    QByteArray tmp = _socket->read(_requestSize);
-    _requestSize -= tmp.size();
-    _buffer.append(tmp);
-  }
-  if (0 == _requestSize) {
-    disconnect(_socket, SIGNAL(readyRead()), this, SLOT(_onReadyRead()));
-    QJsonDocument doc;
-    if (_buffer.size()) {
-      QJsonParseError err;
-      doc.fromJson(_buffer, &err);
-      _buffer.clear();
-      if (QJsonParseError::NoError != err.error) {
-        logInfo() << "JsonParserError: " << err.errorString();
-        this->setResponseCode(HTTP_BAD_REQUEST);
-        this->sendHeaders();
-        return;
-      }
-    }
-    process(doc);
-    this->sendHeaders();
-  }
-}
-
-void
-CtrlResponse::_onHeadersSend() {
-  if (_buffer.size()) {
-    connect(_socket, SIGNAL(bytesWritten(qint64)), this, SLOT(_onBytesWritten(qint64)));
-    _onBytesWritten(0);
-  } else {
-    emit completed();
-  }
-}
-
-void
-CtrlResponse::_onBytesWritten(qint64 n) {
-  if (_buffer.size()) {
-    _buffer = _buffer.mid(n);
-    _socket->write(_buffer);
-  } else {
-    emit completed();
-  }
 }

@@ -59,6 +59,9 @@ public:
   bool operator==(const ScheduledEvent &other) const;
   bool operator!=(const ScheduledEvent &other) const;
 
+  /** Returns true if the event passed (only single events can pass). */
+  bool passed(const QDateTime &timestamp) const;
+
 protected:
   /** The type of the event. */
   Type _type;

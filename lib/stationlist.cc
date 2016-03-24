@@ -232,13 +232,10 @@ StationList::_onUpdateNetwork() {
     // Take some element
     Identifier id = *_candidates.begin(); _candidates.remove(id);
     contactStation(id);
-    return;
-  }
-
-  // If all candidates has been contacted search for new candidates
-  if (_stations.size()) {
+  } else if (_stations.size()) {
+    // If all candidates has been contacted search for new candidates
     size_t idx = dht_rand32() % _stations.size();
-    // Update station
+    // Update station itself
     contactStation(_stations[idx].id());
     // and get station list
     // logDebug() << "Update network: Query start list from " << _stations[idx].id();

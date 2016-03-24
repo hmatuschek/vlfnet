@@ -9,7 +9,7 @@
 class Station;
 class Settings;
 class Identity;
-
+class UPNP;
 
 class Application : public QCoreApplication
 {
@@ -28,6 +28,7 @@ protected:
   Station *_station;
   Settings *_settings;
   QDir _daemonDir;
+  UPNP *_upnp;
   QTimer _ddnsTimer;
 };
 

@@ -6,7 +6,7 @@
 
 
 Settings::Settings(const QString &path, QObject *parent)
-  : QObject(parent), _path(path), _port(4471), _ddnsUpdateUrl("")
+  : QObject(parent), _path(path), _port(4471), _ddnsUpdateUrl(""), _externalPort(0)
 {
   QFile file(path);
   if (! file.open(QIODevice::ReadOnly)) {
@@ -34,6 +34,9 @@ Settings::Settings(const QString &path, QObject *parent)
   }
   if (obj.contains("ddns")) {
     _ddnsUpdateUrl = obj.value("ddns").toString(_ddnsUpdateUrl);
+  }
+  if (obj.contains("upnp_external_port")) {
+    _externalPort = obj.value("upnp_external_port").toInt();
   }
 }
 
@@ -65,12 +68,30 @@ Settings::setDDNSUpdateURL(const QString &url) {
   _save();
 }
 
+bool
+Settings::hasUPnPExternalPort() const {
+  return 0 != _externalPort;
+}
+
+uint16_t
+Settings::upnpExternalPort() const {
+  return _externalPort;
+}
+
+void
+Settings::setUPnPExternalPort(uint16_t port) {
+  _externalPort = port;
+}
+
 void
 Settings::_save() const {
   QJsonObject obj;
   obj.insert("port", _port);
   if (! _ddnsUpdateUrl.isEmpty()) {
     obj.insert("ddns", _ddnsUpdateUrl);
+  }
+  if (0 != _externalPort) {
+    obj.insert("upnp_external_port", _externalPort);
   }
 
   QFile file(_path);

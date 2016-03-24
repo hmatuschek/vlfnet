@@ -5,17 +5,72 @@
 
 
 /* ********************************************************************************************* *
+ * Implementation of Timeseries
+ * ********************************************************************************************* */
+Timeseries::Timeseries()
+  : _offset(0), _identifier(), _location()
+{
+  // pass...
+}
+
+Timeseries::Timeseries(size_t offset, const Timeseries::Header *header)
+  : _offset(offset), _identifier(header->identifier),
+    _location(header->longitude, header->latitude,header->height)
+{
+  // pass...
+}
+
+Timeseries::Timeseries(const Timeseries &other)
+  : _offset(other._offset), _identifier(other._identifier), _location(other._location)
+{
+  // pass...
+}
+
+Timeseries &
+Timeseries::operator =(const Timeseries &other) {
+  _offset = other._offset;
+  _identifier = other._identifier;
+  _location = other._location;
+  return *this;
+}
+
+size_t
+Timeseries::offset() const {
+  return _offset;
+}
+
+const Identifier &
+Timeseries::identifier() const {
+  return _identifier;
+}
+
+const Location &
+Timeseries::location() const {
+  return _location;
+}
+
+QJsonObject
+Timeseries::toJson() const {
+  QJsonObject obj;
+  if (_identifier.isValid()) {
+    obj.insert("id", _identifier.toBase32());
+  }
+  obj.insert("location", _location.toJson());
+  return obj;
+}
+
+
+/* ********************************************************************************************* *
  * Implementation of DataSetFile
  * ********************************************************************************************* */
 DataSetFile::DataSetFile()
-  : _filename(), _timestamp(), _numSamples(0), _sampleRate(0), _parents(), _datasets()
+  : _filename(), _timestamp(), _numSamples(0), _sampleRate(0), _datasets()
 {
   // pass...
 }
 
 DataSetFile::DataSetFile(const QString &filename)
-  : _filename(filename), _timestamp(), _numSamples(0), _sampleRate(0), _parents(),
-    _datasets()
+  : _filename(filename), _timestamp(), _numSamples(0), _sampleRate(0), _datasets()
 {
   QFile file(_filename);
   // Try to open file.
@@ -25,8 +80,8 @@ DataSetFile::DataSetFile(const QString &filename)
     return;
   }
   // Read dataset file header
-  DataSetFileHeader fileheader;
-  if (sizeof(DataSetFileHeader) != file.read((char *) &fileheader, sizeof(fileheader))) {
+  DataSetFile::Header fileheader;
+  if (sizeof(DataSetFile::Header) != file.read((char *) &fileheader, sizeof(DataSetFile::Header))) {
     logError() << "Cannot read dataset file header: Malformed dataset file?";
     _reset();
     return;
@@ -37,40 +92,29 @@ DataSetFile::DataSetFile(const QString &filename)
   size_t numDatasets = ntohs(fileheader.datasets);
   _numSamples  = ntohl(fileheader.samples);
   _sampleRate  = ntohl(fileheader.rate);
-  // Read parent datasets
-  for (uint16_t i=0; i<ntohs(fileheader.parents); i++) {
-    char id[OVL_HASH_SIZE];
-    if (OVL_HASH_SIZE != file.read(id, OVL_HASH_SIZE)) {
-      logError() << "Cannot read parent datasets from file header: Malformed dataset file?";
-      _reset();
-      return;
-    }
-    _parents.push_back(Identifier(id));
-  }
 
   // Read all dataset headers;
-  size_t offset = sizeof(DataSetFileHeader) + OVL_HASH_SIZE*_parents.size();
-  DataSetHeader header;
+  size_t offset = sizeof(DataSetFile::Header);
+  Timeseries::Header header;
   for (size_t i=0; i<numDatasets; i++) {
     if(! file.seek(offset)) {
-      logError() << "Cannot seek to next dataset header: Malformed dataset file?";
+      logError() << "Cannot seek to next timeseries header: Malformed dataset file?";
       _reset();
       return;
     }
-    if (sizeof(DataSetHeader) != file.read((char *) &header, sizeof(DataSetHeader))) {
-      logError() << "Cannot read dataset header: Malformed dataset file`?";
+    if (sizeof(Timeseries::Header) != file.read((char *) &header, sizeof(Timeseries::Header))) {
+      logError() << "Cannot read timeseries header: Malformed dataset file`?";
       _reset();
       return;
     }
-    _datasets.append(QPair<Location, size_t>(
-                       Location(header.latitude, header.latitude, header.height), offset));
+    _datasets.append(Timeseries(offset, &header));
     offset += _numSamples;
   }
 }
 
 DataSetFile::DataSetFile(const DataSetFile &other)
   : _filename(other._filename), _timestamp(other._timestamp), _numSamples(other._numSamples),
-    _sampleRate(other._sampleRate), _parents(other._parents), _datasets(other._datasets)
+    _sampleRate(other._sampleRate), _datasets(other._datasets)
 {
   // pass...
 }
@@ -81,7 +125,6 @@ DataSetFile::operator =(const DataSetFile &other) {
   _timestamp = other._timestamp;
   _numSamples = other._numSamples;
   _sampleRate = other._sampleRate;
-  _parents = other._parents;
   _datasets = other._datasets;
   return *this;
 }
@@ -92,7 +135,6 @@ DataSetFile::_reset() {
   _timestamp = QDateTime();
   _numSamples = 0;
   _sampleRate = 0;
-  _parents.clear();
   _datasets.clear();
 }
 
@@ -123,46 +165,31 @@ DataSetFile::sampleRate() const {
 }
 
 size_t
-DataSetFile::numParents() const {
-  return _parents.size();
-}
-
-const Identifier &
-DataSetFile::parent(size_t i) const {
-  return _parents[i];
-}
-
-const QVector<Identifier> &
-DataSetFile::parents() const {
-  return _parents;
-}
-
-size_t
-DataSetFile::numDatasets() const {
+DataSetFile::numTimeseries() const {
   return _datasets.size();
 }
 
-const Location &
-DataSetFile::datasetLocation(size_t i) const {
-  return _datasets[i].first;
+const Timeseries &
+DataSetFile::timeseries(size_t i) const {
+  return _datasets[i];
 }
 
 bool
-DataSetFile::readDataset(size_t i, int16_t *data) const {
+DataSetFile::readTimeseries(size_t i, int16_t *data) const {
   QFile file(_filename);
   if (! file.open(QIODevice::ReadOnly)) {
     logDebug() << "Cannot read dataset from " << _filename << ": Cannot open file.";
     return false;
   }
-  if (! file.seek(_datasets[i].second+sizeof(DataSetHeader))) {
-    logDebug() << "Cannot seek to dataset in " << _filename << ".";
+  if (! file.seek(_datasets[i].offset()+sizeof(Timeseries::Header))) {
+    logDebug() << "Cannot seek to timeseries in " << _filename << ".";
     return false;
   }
 
   for (size_t i=0; i<_numSamples; i++) {
     int16_t val;
     if (2 != file.read((char *) &val, 2)) {
-      logError() << "Cannot read dataset from file " << _filename << ": read returned error.";
+      logError() << "Cannot read timeseries from file " << _filename << ": read returned error.";
       return false;
     }
     data[i] = ntohs(val);
@@ -177,16 +204,10 @@ DataSetFile::toJson() const {
   res.insert("timestamp", _timestamp.toUTC().toString("yyyy-MM-dd hh:mm:ss"));
   res.insert("samples", int(_numSamples));
   res.insert("samplerate", int(_sampleRate));
-  // assemble parent list
-  QJsonArray parents;
-  for (int i=0; i<_parents.size(); i++) {
-    parents.append(_parents[i].toBase32());
-  }
-  res.insert("parents", parents);
   // Assemble list of datasets
   QJsonArray datasets;
   for (int i=0; i<_datasets.size(); i++) {
-    datasets.append(_datasets[i].first.toJson());
+    datasets.append(_datasets[i].toJson());
   }
   res.insert("timeseries", datasets);
 
@@ -237,10 +258,6 @@ DataSetDir::addDataset(const Identifier &id) {
   _datasets.insert(id, file);
   _datasetOrder.append(id);
   endInsertRows();
-  // Update implicit dataset list:
-  for (size_t i=0; i<file.numParents(); i++) {
-    _parents.insert(file.parent(i), id);
-  }
   return true;
 }
 
@@ -307,7 +324,7 @@ DataSetDir::data(const QModelIndex &index, int role) const {
     return QString::number(_datasets[_datasetOrder[index.row()]].samples() /
         _datasets[_datasetOrder[index.row()]].sampleRate());
   } else if (3 == index.column()) {
-    return QString::number(_datasets[_datasetOrder[index.row()]].numDatasets());
+    return QString::number(_datasets[_datasetOrder[index.row()]].numTimeseries());
   }
 
   return QVariant();
@@ -328,6 +345,56 @@ DataSetDir::headerData(int section, Qt::Orientation orientation, int role) const
   }
 
   return QVariant();
+}
+
+
+/* ********************************************************************************************* *
+ * Implementation of RemoteTimeseries
+ * ********************************************************************************************* */
+RemoteTimeseries::RemoteTimeseries()
+  : _identifier(), _location()
+{
+  // pass...
+}
+
+RemoteTimeseries::RemoteTimeseries(const QJsonObject &obj)
+  : _identifier(), _location()
+{
+  if (obj.contains("id")) {
+    _identifier = Identifier::fromBase32(obj.value("id").toString());
+  }
+  if (! obj.contains("location")) {
+    logError() << "Invalid timeseries: No location specified.";
+    return;
+  }
+  if (! obj.value("location").isObject()) {
+    logError() << "Invalid timeseries: Location is not a JSON object.";
+    return;
+  }
+  _location = Location(obj.value("location").toObject());
+}
+
+RemoteTimeseries::RemoteTimeseries(const RemoteTimeseries &other)
+  : _identifier(other._identifier), _location(other._location)
+{
+  // pass...
+}
+
+RemoteTimeseries &
+RemoteTimeseries::operator =(const RemoteTimeseries &other) {
+  _identifier = other._identifier;
+  _location = other._location;
+  return *this;
+}
+
+const Identifier &
+RemoteTimeseries::identifier() const {
+  return _identifier;
+}
+
+const Location &
+RemoteTimeseries::location() const {
+  return _location;
 }
 
 
@@ -355,18 +422,12 @@ RemoteDataSet::RemoteDataSet(const Identifier &remote, const QJsonObject &obj)
   if (obj.contains("samplerate")) {
     _sampleRate = obj.value("samplerate").toInt();
   }
-  if (obj.contains("parents") && obj.value("parents").isArray()) {
-    QJsonArray parents = obj.value("parents").toArray();
-    for (int i=0; i<parents.size(); i++) {
-      _parents.append(Identifier::fromBase32(parents.at(i).toString()));
-    }
-  }
   if (obj.contains("timeseries") && obj.value("timeseries").isArray()) {
     QJsonArray timeseries = obj.value("timeseries").toArray();
     for (int i=0; i<timeseries.size(); i++) {
-      Location location(timeseries.at(i).toObject());
-      if (! location.isNull())
-        _timeseries.append(location);
+      RemoteTimeseries ts(timeseries.at(i).toObject());
+      if (! ts.location().isNull())
+        _timeseries.append(ts);
     }
   }
 }
@@ -404,28 +465,14 @@ RemoteDataSet::sampleRate() const {
   return _sampleRate;
 }
 
-size_t
-RemoteDataSet::numParents() const {
-  return _parents.size();
-}
-
-const Identifier &
-RemoteDataSet::parent(size_t i) const {
-  return _parents[i];
-}
-
-const QVector<Identifier> &
-RemoteDataSet::parents() const {
-  return _parents;
-}
 
 size_t
-RemoteDataSet::numDatasets() const {
+RemoteDataSet::numTimeseries() const {
   return _timeseries.size();
 }
 
-const Location &
-RemoteDataSet::location(size_t i) const {
+const RemoteTimeseries &
+RemoteDataSet::timeseries(size_t i) const {
   return _timeseries[i];
 }
 
@@ -513,7 +560,7 @@ RemoteDataSetList::data(const QModelIndex &index, int role) const {
   } else if (2 == index.column()) {
     return QString::number(double(dataset.samples())/dataset.sampleRate(), 'f', '1');
   } else if (3 == index.column()) {
-    return int(dataset.numDatasets());
+    return int(dataset.numTimeseries());
   } else if (4 == index.column()) {
     return int(dataset.numRemotes());
   }

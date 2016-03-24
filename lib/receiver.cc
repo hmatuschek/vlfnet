@@ -159,7 +159,7 @@ Receiver::stop() {
 
 bool
 Receiver::save() {
-  DataSetFileHeader fileHeader;
+  DataSetFile::Header fileHeader;
   fileHeader.year = htons(_startTime.date().year());
   fileHeader.month = _startTime.date().month();
   fileHeader.day = _startTime.date().day();
@@ -169,9 +169,8 @@ Receiver::save() {
   fileHeader.datasets = htons(1);
   fileHeader.samples = htonl(_samples);
   fileHeader.rate = htonl(_input->format().sampleRate());
-  fileHeader.parents = 0;
 
-  DataSetHeader header;
+  Timeseries::Header header;
   header.longitude = _station.location().longitude();
   header.latitude = _station.location().latitude();
   header.height = _station.location().height();
@@ -182,11 +181,11 @@ Receiver::save() {
   EVP_MD_CTX mdctx; OVLHashInit(&mdctx);
 
   // Write file header
-  tmpFile.write((const char *) &fileHeader, sizeof(DataSetFileHeader));
-  OVLHashUpdate((const unsigned char *) &fileHeader, sizeof(DataSetFileHeader), &mdctx);
+  tmpFile.write((const char *) &fileHeader, sizeof(DataSetFile::Header));
+  OVLHashUpdate((const unsigned char *) &fileHeader, sizeof(DataSetFile::Header), &mdctx);
   // write dataset header
-  tmpFile.write((const char *) &header, sizeof(DataSetHeader));
-  OVLHashUpdate((const unsigned char *) &header, sizeof(DataSetHeader), &mdctx);
+  tmpFile.write((const char *) &header, sizeof(Timeseries::Header));
+  OVLHashUpdate((const unsigned char *) &header, sizeof(Timeseries::Header), &mdctx);
 
   // copy data from _tmpFile
   _tmpFile.seek(0);

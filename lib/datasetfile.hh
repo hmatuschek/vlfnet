@@ -11,32 +11,54 @@
 #include "location.hh"
 #include "stationlist.hh"
 
-
-typedef struct __attribute__((packed)) {
-  uint16_t year;
-  uint8_t month;
-  uint8_t day;
-  uint8_t hour;
-  uint8_t minute;
-  uint8_t second;
-  uint16_t datasets;
-  uint32_t samples;
-  uint32_t rate;
-  /** Specifies the number of parent dataset which this dataset was derived from.
-   * The parent IDs follow the file header immediately. */
-  uint16_t parents;
-} DataSetFileHeader;
+#include <ovlnet/dht_config.hh>
 
 
-typedef struct __attribute__((packed)) {
-  float longitude;
-  float latitude;
-  float height;
-} DataSetHeader;
+class Timeseries
+{
+public:
+  typedef struct __attribute__((packed)) {
+    float longitude;
+    float latitude;
+    float height;
+    char  identifier[OVL_HASH_SIZE];
+  } Header;
+
+public:
+  Timeseries();
+  Timeseries(size_t offset, const Header *header);
+  Timeseries(const Timeseries &other);
+
+  Timeseries &operator =(const Timeseries &other);
+
+  size_t offset() const;
+  const Identifier &identifier() const;
+  const Location &location() const;
+
+  QJsonObject toJson() const;
+
+protected:
+  size_t     _offset;
+  Identifier _identifier;
+  Location   _location;
+};
 
 
 class DataSetFile
 {
+public:
+  typedef struct __attribute__((packed)) {
+    uint16_t year;
+    uint8_t month;
+    uint8_t day;
+    uint8_t hour;
+    uint8_t minute;
+    uint8_t second;
+    uint16_t datasets;
+    uint32_t samples;
+    uint32_t rate;
+  } Header;
+
 public:
   DataSetFile();
   DataSetFile(const QString &filename);
@@ -50,12 +72,9 @@ public:
   const QDateTime &datetime() const;
   size_t samples() const;
   size_t sampleRate() const;
-  size_t numParents() const;
-  const Identifier &parent(size_t i) const;
-  const QVector<Identifier> &parents() const;
-  size_t numDatasets() const;
-  const Location &datasetLocation(size_t i) const;
-  bool readDataset(size_t i, int16_t *data) const;
+  size_t numTimeseries() const;
+  const Timeseries &timeseries(size_t i) const;
+  bool readTimeseries(size_t i, int16_t *data) const;
 
   QJsonObject toJson() const;
 
@@ -67,8 +86,7 @@ protected:
   QDateTime _timestamp;
   size_t _numSamples;
   size_t _sampleRate;
-  QVector<Identifier> _parents;
-  QVector< QPair<Location, size_t> > _datasets;
+  QVector<Timeseries> _datasets;
 };
 
 
@@ -89,9 +107,9 @@ public:
   /** Retunrs the number of datasets stored in the database. */
   size_t numDatasets() const;
 
-  /** Returns @c true if the database contains the specified identifier. */
+  /** Returns @c true if the database contains the specified dataset. */
   bool contains(const Identifier &id) const;
-  /** Returns @c true if the database contains the specified identifier implicitly. */
+  /** Returns @c true if the database contains the specified dataset implicitly. */
   bool containsImplicitly(const Identifier &id) const;
 
   /** Return the @c DataSetFile for the specified dataset. */
@@ -125,6 +143,24 @@ protected:
 };
 
 
+class RemoteTimeseries
+{
+public:
+  RemoteTimeseries();
+  RemoteTimeseries(const QJsonObject &obj);
+  RemoteTimeseries(const RemoteTimeseries &other);
+
+  RemoteTimeseries &operator =(const RemoteTimeseries &other);
+
+  const Identifier &identifier() const;
+  const Location &location() const;
+
+protected:
+  Identifier _identifier;
+  Location _location;
+};
+
+
 class RemoteDataSet
 {
 public:
@@ -139,12 +175,8 @@ public:
   size_t samples() const;
   size_t sampleRate() const;
 
-  size_t numParents() const;
-  const Identifier &parent(size_t i) const;
-  const QVector<Identifier> &parents() const;
-
-  size_t numDatasets() const;
-  const Location &location(size_t i) const;
+  size_t numTimeseries() const;
+  const RemoteTimeseries &timeseries(size_t i) const;
 
   size_t numRemotes() const;
   void addRemote(const Identifier &remote);
@@ -155,7 +187,7 @@ protected:
   size_t _samples;
   size_t _sampleRate;
   QVector<Identifier> _parents;
-  QVector<Location> _timeseries;
+  QVector<RemoteTimeseries> _timeseries;
   QSet<Identifier> _remotes;
 };
 

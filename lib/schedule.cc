@@ -146,6 +146,13 @@ ScheduledEvent::toJson() const {
 }
 
 bool
+ScheduledEvent::passed(const QDateTime &timestamp) const {
+  if (_type != SINGLE)
+    return false;
+  return _first < timestamp;
+}
+
+bool
 ScheduledEvent::operator ==(const ScheduledEvent &other) const {
   if (_type != other._type) { return false; }
   return _first == other._first;
@@ -572,10 +579,11 @@ MergedSchedule::_onScheduleUpdate() {
     // Filter remote events by cost
     QVector< QPair<ScheduledEvent, size_t> > remEvt; remEvt.reserve(_remote.numEvents());
     for (size_t i=0; i<_remote.numEvents(); i++) {
-      // Ignore all events to expesive or already on local schedule
-      if ( (_remote.scheduledEvent(i).cost() < cost) && ! _local.contains(_remote.scheduledEvent(i))) {
+      // Ignore all events to expesive or already on local schedule or passed
+      if ( (_remote.scheduledEvent(i).cost() < cost)
+           && !_local.contains(_remote.scheduledEvent(i))
+           && !_remote.scheduledEvent(i).passed(QDateTime::currentDateTime()))
         remEvt.append(QPair<ScheduledEvent, size_t>(_remote.scheduledEvent(i), _remote.numNodes(i)));
-      }
     }
     // sort remote events by weight
     qStableSort(remEvt.begin(), remEvt.end(), &eventWeightLessThan);
