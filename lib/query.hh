@@ -50,6 +50,7 @@ protected slots:
 protected:
   QString _query;
   Node &_node;
+  Identifier _remoteId;
   HttpClientConnection *_connection;
   HttpClientResponse *_response;
   size_t _responseLength;

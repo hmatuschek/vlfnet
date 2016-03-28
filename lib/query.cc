@@ -32,7 +32,7 @@ StationResolveQuery::failed() {
  * Implementation of JsonQuery
  * ********************************************************************************************* */
 JsonQuery::JsonQuery(const QString &path, Node &node, const Identifier &remote)
-  : QObject(0), _query(path), _node(node)
+  : QObject(0), _query(path), _node(node), _remoteId(remote)
 {
   StationResolveQuery *query = new StationResolveQuery(_node, remote);
   connect(query, SIGNAL(found(NodeItem)), this, SLOT(_onNodeFound(NodeItem)));
@@ -40,7 +40,7 @@ JsonQuery::JsonQuery(const QString &path, Node &node, const Identifier &remote)
 }
 
 JsonQuery::JsonQuery(const QString &path, Node &node, const NodeItem &remote)
-  : QObject(0), _query(path), _node(node)
+  : QObject(0), _query(path), _node(node), _remoteId(remote.id())
 {
   _onNodeFound(remote);
 }
@@ -84,7 +84,7 @@ JsonQuery::_onResponseReceived() {
 
 void
 JsonQuery::_onError() {
-  logError() << "Failed to access " << _query << ".";
+  logError() << "Failed to access " << _query << " at " << _remoteId.toBase32() << ".";
   emit failed();
   deleteLater();
 }
