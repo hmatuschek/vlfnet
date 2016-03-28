@@ -6,7 +6,7 @@
 
 
 Settings::Settings(const QString &path, QObject *parent)
-  : QObject(parent), _path(path), _port(4471), _ddnsUpdateUrl(""), _externalPort(0)
+  : QObject(parent), _path(path), _port(7741), _ddnsUpdateUrl(""), _externalPort(0)
 {
   QFile file(path);
   if (! file.open(QIODevice::ReadOnly)) {
